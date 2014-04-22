@@ -518,7 +518,7 @@ func (cmd commandPort) Execute(conn *ftpConn, param string) {
 		return
 	}
 
-	conn.writeMessage(200, "Connection established ("+strconv.Itoa(port)+")")
+	conn.writeMessage(200, fmt.Sprintf("Connection established (%d)", port))
 }
 
 // commandProt responds to the PROT FTP command.

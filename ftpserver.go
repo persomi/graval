@@ -51,6 +51,8 @@ type FTPServerOpts struct {
 type FTPServer struct {
 	serverName    string
 	listenTo      string
+	listener      net.Listener
+	closed        bool
 	driverFactory FTPDriverFactory
 	logger        *ftpLogger
 	passiveOpts   *PassiveOpts
@@ -143,8 +145,14 @@ func (ftpServer *FTPServer) ListenAndServe() error {
 	if err != nil {
 		return err
 	}
+	ftpServer.listener = listener
 	for {
 		tcpConn, err := listener.AcceptTCP()
+
+		if ftpServer.closed {
+			return nil
+		}
+
 		if err != nil {
 			ftpServer.logger.Print("listening error")
 			break
@@ -158,6 +166,11 @@ func (ftpServer *FTPServer) ListenAndServe() error {
 		}
 	}
 	return nil
+}
+
+func (ftpServer *FTPServer) Close() error {
+	ftpServer.closed = true
+	return ftpServer.listener.Close()
 }
 
 func buildTcpString(hostname string, port int) (result string) {

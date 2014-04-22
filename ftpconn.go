@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"crypto/rand"
 	"crypto/sha256"
+	"crypto/tls"
 	"encoding/hex"
 	"fmt"
 	"io"
@@ -15,7 +16,7 @@ import (
 )
 
 type ftpConn struct {
-	conn          *net.TCPConn
+	conn          net.Conn
 	controlReader *bufio.Reader
 	controlWriter *bufio.Writer
 	dataConn      ftpDataSocket
@@ -39,14 +40,19 @@ func newftpConn(tcpConn *net.TCPConn, driver FTPDriver, serverName string, passi
 	c := new(ftpConn)
 	c.namePrefix = "/"
 	c.conn = tcpConn
-	c.controlReader = bufio.NewReader(tcpConn)
-	c.controlWriter = bufio.NewWriter(tcpConn)
 	c.driver = driver
 	c.sessionId = newSessionId()
 	c.logger = newFtpLogger(c.sessionId)
 	c.passiveOpts = passiveOpts
 	c.cryptoConfig = cryptoConfig
 	c.serverName = serverName
+
+	if cryptoConfig.Implicit {
+		c.startTls()
+	} else {
+		c.setupReaderWriter()
+	}
+
 	return c
 }
 
@@ -60,6 +66,11 @@ func newSessionId() string {
 	md := hash.Sum(nil)
 	mdStr := hex.EncodeToString(md)
 	return mdStr[0:20]
+}
+
+func (ftpConn *ftpConn) setupReaderWriter() {
+	ftpConn.controlReader = bufio.NewReader(ftpConn.conn)
+	ftpConn.controlWriter = bufio.NewWriter(ftpConn.conn)
 }
 
 // Serve starts an endless loop that reads FTP commands from the client and
@@ -187,6 +198,13 @@ func (ftpConn *ftpConn) sendOutofbandReader(reader io.Reader) {
 // data socket. Assumes the socket is open and ready to be used.
 func (ftpConn *ftpConn) sendOutofbandData(data string) {
 	ftpConn.sendOutofbandReader(bytes.NewReader([]byte(data)))
+}
+
+func (ftpConn *ftpConn) startTls() {
+	ftpConn.conn = tls.Server(ftpConn.conn, ftpConn.cryptoConfig.TlsConfig)
+	ftpConn.setupReaderWriter()
+
+	return
 }
 
 func (ftpConn *ftpConn) newPassiveSocket() (socket *ftpPassiveSocket, err error) {

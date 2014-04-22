@@ -10,44 +10,26 @@ Some sample use cases include persisting data to:
 * redis
 * memory
 
-There is a sample in-memory driver available - see the usage instructions below
-for the steps to use it.
-
-Full documentation for the package is available on [godoc](http://godoc.org/github.com/yob/graval)
+Full documentation for the package is available on [godoc](http://godoc.org/github.com/koofr/graval)
 
 ## Installation
 
-    go get github.com/yob/graval
+    go get github.com/koofr/graval
 
 ## Usage
 
 To boot an FTP server you will need to provide a driver that speaks to your
 persistence layer - the required driver contract is listed below.
 
-There is a sample in-memory driver available as a demo. You can build it with
-this command:
-
-    go install github.com/yob/graval/graval-mem
-
-Then run it:
-
-    ./bin/graval-mem
-
-And finally, connect to the server with any FTP client and the following
-details:
-
-    host: 127.0.0.1
-    username: test
-    password: 1234
-
 ### The Driver Contract
 
 Your driver MUST implement a number of simple methods. You can view the required
-contract in the package docs on [godoc](http://godoc.org/github.com/yob/graval)
+contract in the package docs on [godoc](http://godoc.org/github.com/koofr/graval)
 
 ## Contributors
 
 * James Healy <james@yob.id.au> [http://www.yob.id.au](http://www.yob.id.au)
+* Luka Zakrajsek <luka@koofr.net> [http://koofr.net](http://koofr.net)
 
 ## Warning
 
@@ -91,3 +73,6 @@ This library is heavily based on [em-ftpd](https://github.com/yob/em-ftpd), an F
 framework with similar design goals within the ruby and EventMachine ecosystems. It
 worked well enough, but you know, callbacks and event loops make me something
 something.
+
+TLS implementation and some other commands are based on
+[pyftpdlib](https://code.google.com/p/pyftpdlib).

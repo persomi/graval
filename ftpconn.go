@@ -31,6 +31,7 @@ type ftpConn struct {
 	user          string
 	renameFrom    string
 	usingTls      bool
+	usingPbsz     bool
 }
 
 // NewftpConn constructs a new object that will handle the FTP protocol over
@@ -49,6 +50,7 @@ func newftpConn(tcpConn *net.TCPConn, driver FTPDriver, serverName string, passi
 	c.serverName = serverName
 
 	c.usingTls = false
+	c.usingPbsz = false
 
 	if cryptoConfig.Implicit {
 		c.startTls()

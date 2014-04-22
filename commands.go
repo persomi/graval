@@ -37,6 +37,7 @@ var (
 		"OPTS": commandOpts{},
 		"PASS": commandPass{},
 		"PASV": commandPasv{},
+		"PBSZ": commandPbsz{},
 		"PORT": commandPort{},
 		"PWD":  commandPwd{},
 		"QUIT": commandQuit{},
@@ -248,6 +249,7 @@ func (cmd commandFeat) Execute(conn *ftpConn, param string) {
 		" EPRT",
 		" EPSV",
 		" MDTM",
+		" PBSZ",
 		" SIZE",
 		" UTF8",
 		"211 End FEAT.",
@@ -463,6 +465,30 @@ func (cmd commandPasv) Execute(conn *ftpConn, param string) {
 	target := fmt.Sprintf("(%s,%s,%s,%s,%d,%d)", quads[0], quads[1], quads[2], quads[3], p1, p2)
 	msg := "Entering Passive Mode " + target
 	conn.writeMessage(227, msg)
+}
+
+// commandPbsz responds to the PBSZ FTP command.
+//
+// Negotiate size of buffer for secure data transfer.
+// For TLS/SSL the only valid value for the parameter is '0'.
+// Any other value is accepted but ignored.
+type commandPbsz struct{}
+
+func (cmd commandPbsz) RequireParam() bool {
+	return false
+}
+
+func (cmd commandPbsz) RequireAuth() bool {
+	return false
+}
+
+func (cmd commandPbsz) Execute(conn *ftpConn, param string) {
+	if conn.usingTls {
+		conn.writeMessage(200, "PBSZ=0 successful.")
+		conn.usingPbsz = true
+	} else {
+		conn.writeMessage(503, "PBSZ not allowed on insecure control connection.")
+	}
 }
 
 // commandPort responds to the PORT FTP command.

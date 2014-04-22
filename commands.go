@@ -202,11 +202,14 @@ func (cmd commandList) RequireAuth() bool {
 }
 
 func (cmd commandList) Execute(conn *ftpConn, param string) {
-	conn.writeMessage(150, "Opening ASCII mode data connection for file list")
 	path := conn.buildPath(param)
-	files := conn.driver.DirContents(path)
-	formatter := newListFormatter(files)
-	conn.sendOutofbandData(formatter.Detailed())
+	if files, ok := conn.driver.DirContents(path); ok {
+		conn.writeMessage(150, "Opening ASCII mode data connection for file list")
+		formatter := newListFormatter(files)
+		conn.sendOutofbandData(formatter.Detailed())
+	} else {
+		conn.writeMessage(450, "File not available")
+	}
 }
 
 // commandNlst responds to the NLST FTP command. It allows the client to
@@ -222,11 +225,14 @@ func (cmd commandNlst) RequireAuth() bool {
 }
 
 func (cmd commandNlst) Execute(conn *ftpConn, param string) {
-	conn.writeMessage(150, "Opening ASCII mode data connection for file list")
 	path := conn.buildPath(param)
-	files := conn.driver.DirContents(path)
-	formatter := newListFormatter(files)
-	conn.sendOutofbandData(formatter.Short())
+	if files, ok := conn.driver.DirContents(path); ok {
+		conn.writeMessage(150, "Opening ASCII mode data connection for file list")
+		formatter := newListFormatter(files)
+		conn.sendOutofbandData(formatter.Short())
+	} else {
+		conn.writeMessage(450, "File not available")
+	}
 }
 
 // commandMdtm responds to the MDTM FTP command. It allows the client to
@@ -243,8 +249,7 @@ func (cmd commandMdtm) RequireAuth() bool {
 
 func (cmd commandMdtm) Execute(conn *ftpConn, param string) {
 	path := conn.buildPath(param)
-	time, err := conn.driver.ModifiedTime(path)
-	if err == nil {
+	if time, ok := conn.driver.ModifiedTime(path); ok {
 		conn.writeMessage(213, strftime.Format("%Y%m%d%H%M%S", time))
 	} else {
 		conn.writeMessage(450, "File not available")
@@ -442,11 +447,11 @@ func (cmd commandRetr) RequireAuth() bool {
 
 func (cmd commandRetr) Execute(conn *ftpConn, param string) {
 	path := conn.buildPath(param)
-	data, err := conn.driver.GetFile(path)
-	if err == nil {
-		bytes := strconv.Itoa(len(data))
-		conn.writeMessage(150, "Data transfer starting "+bytes+" bytes")
-		conn.sendOutofbandData(data)
+
+	if reader, ok := conn.driver.GetFile(path); ok {
+		defer reader.Close()
+		conn.writeMessage(125, "Data connection already open. Transfer starting.")
+		conn.sendOutofbandReader(reader)
 	} else {
 		conn.writeMessage(551, "File not available")
 	}
@@ -527,7 +532,7 @@ func (cmd commandSize) Execute(conn *ftpConn, param string) {
 	path := conn.buildPath(param)
 	bytes := conn.driver.Bytes(path)
 	if bytes >= 0 {
-		conn.writeMessage(213, strconv.Itoa(bytes))
+		conn.writeMessage(213, fmt.Sprintf("%d", bytes))
 	} else {
 		conn.writeMessage(450, "file not available")
 	}

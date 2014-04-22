@@ -23,13 +23,13 @@ type FTPDriver interface {
 	// params  - a file path
 	// returns - an int with the number of bytes in the file or -1 if the file
 	//           doesn't exist
-	Bytes(string) int
+	Bytes(string) int64
 
 	// params  - a file path
 	// returns - a time indicating when the requested path was last modified
-	//         - an error if the file doesn't exist or the user lacks
+	//         - an ok flag if the file doesn't exist or the user lacks
 	//           permissions
-	ModifiedTime(string) (time.Time, error)
+	ModifiedTime(string) (time.Time, bool)
 
 	// params  - path
 	// returns - true if the current user is permitted to change to the
@@ -39,7 +39,7 @@ type FTPDriver interface {
 	// params  - path
 	// returns - a collection of items describing the contents of the requested
 	//           path
-	DirContents(string) []os.FileInfo
+	DirContents(string) ([]os.FileInfo, bool)
 
 	// params  - path
 	// returns - true if the directory was deleted
@@ -59,7 +59,7 @@ type FTPDriver interface {
 
 	// params  - path
 	// returns - a string containing the file data to send to the client
-	GetFile(string) (string, error)
+	GetFile(string) (io.ReadCloser, bool)
 
 	// params  - desination path, an io.Reader containing the file data
 	// returns - true if the data was successfully persisted

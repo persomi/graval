@@ -30,6 +30,7 @@ type ftpConn struct {
 	reqUser       string
 	user          string
 	renameFrom    string
+	usingTls      bool
 }
 
 // NewftpConn constructs a new object that will handle the FTP protocol over
@@ -46,6 +47,8 @@ func newftpConn(tcpConn *net.TCPConn, driver FTPDriver, serverName string, passi
 	c.passiveOpts = passiveOpts
 	c.cryptoConfig = cryptoConfig
 	c.serverName = serverName
+
+	c.usingTls = false
 
 	if cryptoConfig.Implicit {
 		c.startTls()
@@ -200,9 +203,19 @@ func (ftpConn *ftpConn) sendOutofbandData(data string) {
 	ftpConn.sendOutofbandReader(bytes.NewReader([]byte(data)))
 }
 
+func (ftpConn *ftpConn) canStartTls() bool {
+	return ftpConn.cryptoConfig != nil && ftpConn.cryptoConfig.TlsConfig != nil
+}
+
 func (ftpConn *ftpConn) startTls() {
+	if ftpConn.usingTls {
+		return
+	}
+
 	ftpConn.conn = tls.Server(ftpConn.conn, ftpConn.cryptoConfig.TlsConfig)
 	ftpConn.setupReaderWriter()
+
+	ftpConn.usingTls = true
 
 	return
 }

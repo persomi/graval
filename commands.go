@@ -21,6 +21,7 @@ type commandMap map[string]ftpCommand
 var (
 	commands = commandMap{
 		"ALLO": commandAllo{},
+		"AUTH": commandAuth{},
 		"CDUP": commandCdup{},
 		"CWD":  commandCwd{},
 		"DELE": commandDele{},
@@ -72,6 +73,39 @@ func (cmd commandAllo) RequireAuth() bool {
 
 func (cmd commandAllo) Execute(conn *ftpConn, param string) {
 	conn.writeMessage(202, "Obsolete")
+}
+
+// commandAuth responds to the AUTH FTP command.
+//
+// Set up secure control channel.
+type commandAuth struct{}
+
+func (cmd commandAuth) RequireParam() bool {
+	return true
+}
+
+func (cmd commandAuth) RequireAuth() bool {
+	return false
+}
+
+func (cmd commandAuth) Execute(conn *ftpConn, param string) {
+	if conn.usingTls {
+		conn.writeMessage(503, "Already using TLS.")
+		return
+	}
+
+	if !conn.canStartTls() {
+		conn.writeMessage(500, "Command not found")
+		return
+	}
+
+	if param == "TLS" || param == "TLS-C" || param == "SSL" || param == "TLS-P" {
+		conn.writeMessage(234, fmt.Sprintf("AUTH %s successful.", param))
+
+		conn.startTls()
+	} else {
+		conn.writeMessage(502, "Unrecognized encryption type (use TLS or SSL).")
+	}
 }
 
 // commandCdup responds to the CDUP FTP command.
@@ -209,6 +243,8 @@ func (cmd commandFeat) RequireAuth() bool {
 func (cmd commandFeat) Execute(conn *ftpConn, param string) {
 	conn.writeLines(211,
 		"211-Features supported:",
+		" AUTH TLS",
+		" AUTH SSL",
 		" EPRT",
 		" EPSV",
 		" MDTM",

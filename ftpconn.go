@@ -195,6 +195,9 @@ func (ftpConn *ftpConn) buildPath(filename string) (fullPath string) {
 func (ftpConn *ftpConn) sendOutofbandReader(reader io.Reader) {
 	defer ftpConn.dataConn.Close()
 
+	// we need an empty write for TLS connection if reader is empty
+	_, _ = ftpConn.dataConn.Write([]byte{})
+
 	_, err := io.Copy(ftpConn.dataConn, reader)
 
 	if err != nil {

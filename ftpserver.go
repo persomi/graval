@@ -9,10 +9,16 @@
 package graval
 
 import (
+	"crypto/tls"
 	"net"
 	"strconv"
 	"strings"
 )
+
+type CryptoConfig struct {
+	Implicit  bool
+	TlsConfig *tls.Config
+}
 
 // serverOpts contains parameters for graval.NewFTPServer()
 type FTPServerOpts struct {
@@ -33,6 +39,9 @@ type FTPServerOpts struct {
 
 	// Options for passive data connections
 	PassiveOpts *PassiveOpts
+
+	// Options for FTPS and FTPES
+	CryptoConfig *CryptoConfig
 }
 
 // FTPServer is the root of your FTP application. You should instantiate one
@@ -45,6 +54,7 @@ type FTPServer struct {
 	driverFactory FTPDriverFactory
 	logger        *ftpLogger
 	passiveOpts   *PassiveOpts
+	cryptoConfig  *CryptoConfig
 }
 
 // serverOptsWithDefaults copies an FTPServerOpts struct into a new struct,
@@ -82,6 +92,8 @@ func serverOptsWithDefaults(opts *FTPServerOpts) *FTPServerOpts {
 		newOpts.PassiveOpts = opts.PassiveOpts
 	}
 
+	newOpts.CryptoConfig = opts.CryptoConfig
+
 	return &newOpts
 }
 
@@ -110,6 +122,7 @@ func NewFTPServer(opts *FTPServerOpts) *FTPServer {
 	s.driverFactory = opts.Factory
 	s.logger = newFtpLogger("")
 	s.passiveOpts = opts.PassiveOpts
+	s.cryptoConfig = opts.CryptoConfig
 	return s
 }
 
@@ -140,7 +153,7 @@ func (ftpServer *FTPServer) ListenAndServe() error {
 		if err != nil {
 			ftpServer.logger.Print("Error creating driver, aborting client connection")
 		} else {
-			ftpConn := newftpConn(tcpConn, driver, ftpServer.serverName, ftpServer.passiveOpts)
+			ftpConn := newftpConn(tcpConn, driver, ftpServer.serverName, ftpServer.passiveOpts, ftpServer.cryptoConfig)
 			go ftpConn.Serve()
 		}
 	}

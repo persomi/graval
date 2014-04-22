@@ -2,11 +2,24 @@ package graval
 
 import (
 	"errors"
+	"fmt"
+	"math/rand"
 	"net"
 	"strconv"
 	"strings"
 	"time"
 )
+
+type PassivePorts struct {
+	Low  int
+	High int
+}
+
+type PassiveOpts struct {
+	ListenAddress string
+	NatAddress    string
+	PassivePorts  *PassivePorts
+}
 
 // A data socket is used to send non-control data between the client and
 // server.
@@ -74,30 +87,45 @@ func (socket *ftpActiveSocket) Close() error {
 }
 
 type ftpPassiveSocket struct {
-	conn    *net.TCPConn
-	port    int
-	ingress chan []byte
-	egress  chan []byte
-	logger  *ftpLogger
+	conn        *net.TCPConn
+	host        string
+	port        int
+	ingress     chan []byte
+	egress      chan []byte
+	logger      *ftpLogger
+	passiveOpts *PassiveOpts
 }
 
-func newPassiveSocket(logger *ftpLogger) (*ftpPassiveSocket, error) {
+func newPassiveSocket(logger *ftpLogger, passiveOpts *PassiveOpts) (*ftpPassiveSocket, error) {
 	socket := new(ftpPassiveSocket)
 	socket.ingress = make(chan []byte)
 	socket.egress = make(chan []byte)
 	socket.logger = logger
+	socket.passiveOpts = passiveOpts
+
 	go socket.ListenAndServe()
+
+	retries := 100
+
 	for {
 		if socket.Port() > 0 {
 			break
 		}
+
+		retries -= 1
+
+		if retries == 0 {
+			return nil, fmt.Errorf("newPassiveSocket socket port not found")
+		}
+
 		time.Sleep(100 * time.Millisecond)
 	}
+
 	return socket, nil
 }
 
 func (socket *ftpPassiveSocket) Host() string {
-	return "127.0.0.1"
+	return socket.host
 }
 
 func (socket *ftpPassiveSocket) Port() int {
@@ -123,28 +151,76 @@ func (socket *ftpPassiveSocket) Close() error {
 	return socket.conn.Close()
 }
 
+func (socket *ftpPassiveSocket) listenHost() string {
+	if socket.passiveOpts.ListenAddress != "" {
+		return socket.passiveOpts.ListenAddress
+	} else {
+		return "0.0.0.0"
+	}
+}
+
+func (socket *ftpPassiveSocket) randomPort() int {
+	if socket.passiveOpts.PassivePorts != nil {
+		low := socket.passiveOpts.PassivePorts.Low
+		high := socket.passiveOpts.PassivePorts.High
+
+		return low + rand.Intn(high-low-1)
+	} else {
+		return 0
+	}
+}
+
 func (socket *ftpPassiveSocket) ListenAndServe() {
-	laddr, err := net.ResolveTCPAddr("tcp", socket.Host()+":0")
+	laddr, err := net.ResolveTCPAddr("tcp", socket.listenHost()+":0")
+
 	if err != nil {
 		socket.logger.Print(err)
 		return
 	}
-	listener, err := net.ListenTCP("tcp", laddr)
-	if err != nil {
-		socket.logger.Print(err)
-		return
+
+	var listener *net.TCPListener
+
+	retries := 100
+
+	for {
+		laddr.Port = socket.randomPort()
+
+		listener, err = net.ListenTCP("tcp4", laddr)
+
+		if err != nil {
+			if retries > 0 {
+				retries -= 1
+				time.Sleep(10 * time.Millisecond)
+				continue
+			}
+
+			socket.logger.Print(err)
+
+			return
+		}
+
+		break
 	}
-	add := listener.Addr()
-	parts := strings.Split(add.String(), ":")
+
+	addr := listener.Addr()
+
+	parts := strings.Split(addr.String(), ":")
+
+	socket.host = parts[0]
+
 	port, err := strconv.Atoi(parts[1])
+
 	if err == nil {
 		socket.port = port
 	}
+
 	tcpConn, err := listener.AcceptTCP()
+
 	if err != nil {
 		socket.logger.Print(err)
 		return
 	}
+
 	socket.conn = tcpConn
 }
 

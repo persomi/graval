@@ -151,6 +151,11 @@ func (socket *ftpPassiveSocket) Write(p []byte) (n int, err error) {
 
 func (socket *ftpPassiveSocket) Close() error {
 	socket.logger.Print("closing passive data socket")
+
+	if socket.conn == nil {
+		return nil
+	}
+
 	return socket.conn.Close()
 }
 

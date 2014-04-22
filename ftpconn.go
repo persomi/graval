@@ -195,23 +195,25 @@ func (ftpConn *ftpConn) buildPath(filename string) (fullPath string) {
 // sendOutofbandData will copy data from reader to the client via the currently
 // open data socket. Assumes the socket is open and ready to be used.
 func (ftpConn *ftpConn) sendOutofbandReader(reader io.Reader) {
-	defer ftpConn.dataConn.Close()
-
 	// we need an empty write for TLS connection if reader is empty
 	_, _ = ftpConn.dataConn.Write([]byte{})
 
 	_, err := io.Copy(ftpConn.dataConn, reader)
 
 	if err != nil {
+		ftpConn.dataConn.Close()
+
 		ftpConn.logger.Printf("sendOutofbandReader copy error %s", err)
 		ftpConn.writeMessage(550, "Action not taken")
 		return
 	}
 
-	ftpConn.writeMessage(226, "Transfer complete.")
-
 	// Chrome dies on localhost if we close connection to soon
 	time.Sleep(10 * time.Millisecond)
+
+	ftpConn.dataConn.Close()
+
+	ftpConn.writeMessage(226, "Transfer complete.")
 }
 
 // sendOutofbandData will send a string to the client via the currently open

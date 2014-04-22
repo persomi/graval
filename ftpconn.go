@@ -32,6 +32,7 @@ type ftpConn struct {
 	renameFrom    string
 	usingTls      bool
 	usingPbsz     bool
+	usingProt     bool
 }
 
 // NewftpConn constructs a new object that will handle the FTP protocol over
@@ -51,6 +52,7 @@ func newftpConn(tcpConn *net.TCPConn, driver FTPDriver, serverName string, passi
 
 	c.usingTls = false
 	c.usingPbsz = false
+	c.usingProt = false
 
 	if cryptoConfig.Implicit {
 		c.startTls()
@@ -228,7 +230,13 @@ func (ftpConn *ftpConn) newPassiveSocket() (socket *ftpPassiveSocket, err error)
 		ftpConn.dataConn = nil
 	}
 
-	socket, err = newPassiveSocket(ftpConn.logger, ftpConn.passiveOpts)
+	var tlsConfig *tls.Config
+
+	if ftpConn.usingProt {
+		tlsConfig = ftpConn.cryptoConfig.TlsConfig
+	}
+
+	socket, err = newPassiveSocket(ftpConn.logger, ftpConn.passiveOpts, tlsConfig)
 
 	if err == nil {
 		ftpConn.dataConn = socket

@@ -39,6 +39,7 @@ var (
 		"PASV": commandPasv{},
 		"PBSZ": commandPbsz{},
 		"PORT": commandPort{},
+		"PROT": commandProt{},
 		"PWD":  commandPwd{},
 		"QUIT": commandQuit{},
 		"RETR": commandRetr{},
@@ -250,6 +251,7 @@ func (cmd commandFeat) Execute(conn *ftpConn, param string) {
 		" EPSV",
 		" MDTM",
 		" PBSZ",
+		" PROT",
 		" SIZE",
 		" UTF8",
 		"211 End FEAT.",
@@ -520,6 +522,38 @@ func (cmd commandPort) Execute(conn *ftpConn, param string) {
 	}
 
 	conn.writeMessage(200, "Connection established ("+strconv.Itoa(port)+")")
+}
+
+// commandProt responds to the PROT FTP command.
+//
+// Setup un/secure data channel.
+type commandProt struct{}
+
+func (cmd commandProt) RequireParam() bool {
+	return false
+}
+
+func (cmd commandProt) RequireAuth() bool {
+	return false
+}
+
+func (cmd commandProt) Execute(conn *ftpConn, param string) {
+	param = strings.ToUpper(param)
+
+	if !conn.usingTls {
+		conn.writeMessage(503, "PROT not allowed on insecure control connection.")
+	} else if !conn.usingPbsz {
+		conn.writeMessage(503, "You must issue the PBSZ command prior to PROT.")
+	} else if param == "C" {
+		conn.writeMessage(200, "Protection set to Clear")
+	} else if param == "P" {
+		conn.writeMessage(200, "Protection set to Private")
+		conn.usingProt = true
+	} else if param == "S" || param == "E" {
+		conn.writeMessage(521, fmt.Sprintf("PROT %s unsupported (use C or P).", param))
+	} else {
+		conn.writeMessage(502, "Unrecognized PROT type (use C or P).")
+	}
 }
 
 // commandPwd responds to the PWD FTP command.

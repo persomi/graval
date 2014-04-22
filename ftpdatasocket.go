@@ -1,6 +1,7 @@
 package graval
 
 import (
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"math/rand"
@@ -87,21 +88,23 @@ func (socket *ftpActiveSocket) Close() error {
 }
 
 type ftpPassiveSocket struct {
-	conn        *net.TCPConn
+	conn        net.Conn
 	host        string
 	port        int
 	ingress     chan []byte
 	egress      chan []byte
 	logger      *ftpLogger
 	passiveOpts *PassiveOpts
+	tlsConfig   *tls.Config
 }
 
-func newPassiveSocket(logger *ftpLogger, passiveOpts *PassiveOpts) (*ftpPassiveSocket, error) {
+func newPassiveSocket(logger *ftpLogger, passiveOpts *PassiveOpts, tlsConfig *tls.Config) (*ftpPassiveSocket, error) {
 	socket := new(ftpPassiveSocket)
 	socket.ingress = make(chan []byte)
 	socket.egress = make(chan []byte)
 	socket.logger = logger
 	socket.passiveOpts = passiveOpts
+	socket.tlsConfig = tlsConfig
 
 	go socket.ListenAndServe()
 
@@ -221,7 +224,11 @@ func (socket *ftpPassiveSocket) ListenAndServe() {
 		return
 	}
 
-	socket.conn = tcpConn
+	if socket.tlsConfig != nil {
+		socket.conn = tls.Server(tcpConn, socket.tlsConfig)
+	} else {
+		socket.conn = tcpConn
+	}
 }
 
 func (socket *ftpPassiveSocket) waitForOpenSocket() bool {

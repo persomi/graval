@@ -195,6 +195,9 @@ func (ftpConn *ftpConn) buildPath(filename string) (fullPath string) {
 // sendOutofbandData will copy data from reader to the client via the currently
 // open data socket. Assumes the socket is open and ready to be used.
 func (ftpConn *ftpConn) sendOutofbandReader(reader io.Reader) {
+	// wait for 125 and 150 messages to be writen
+	time.Sleep(10 * time.Millisecond)
+
 	// we need an empty write for TLS connection if reader is empty
 	_, _ = ftpConn.dataConn.Write([]byte{})
 

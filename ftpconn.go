@@ -198,6 +198,17 @@ func (ftpConn *ftpConn) buildPath(filename string) (fullPath string) {
 // sendOutofbandData will copy data from reader to the client via the currently
 // open data socket. Assumes the socket is open and ready to be used.
 func (ftpConn *ftpConn) sendOutofbandReader(reader io.Reader) {
+	defer func() {
+		ftpConn.dataConn = nil
+	}()
+
+	if !ftpConn.DataConnWait(10 * time.Second) {
+		ftpConn.writeMessage(425, "Can't open data connection.")
+		return
+	}
+
+	ftpConn.writeMessage(125, "Data connection already open. Transfer starting.")
+
 	// wait for 125 and 150 messages to be writen
 	time.Sleep(10 * time.Millisecond)
 
@@ -220,6 +231,14 @@ func (ftpConn *ftpConn) sendOutofbandReader(reader io.Reader) {
 	ftpConn.dataConn.Close()
 
 	ftpConn.writeMessage(226, "Transfer complete.")
+}
+
+func (ftpConn *ftpConn) DataConnWait(timeout time.Duration) bool {
+	if ftpConn.dataConn == nil {
+		return false
+	}
+
+	return ftpConn.dataConn.Wait(timeout)
 }
 
 // sendOutofbandData will send a string to the client via the currently open

@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"github.com/koofr/goevent"
 	"math/rand"
 	"net"
 	"strconv"
@@ -37,13 +38,17 @@ type ftpDataSocket interface {
 
 	// the standard io.Closer interface
 	Close() error
+
+	// wait for client to connect
+	Wait(timeout time.Duration) bool
 }
 
 type ftpActiveSocket struct {
-	conn   *net.TCPConn
-	host   string
-	port   int
-	logger *ftpLogger
+	conn      *net.TCPConn
+	connected *goevent.Event
+	host      string
+	port      int
+	logger    *ftpLogger
 }
 
 func newActiveSocket(host string, port int, logger *ftpLogger) (*ftpActiveSocket, error) {
@@ -64,6 +69,8 @@ func newActiveSocket(host string, port int, logger *ftpLogger) (*ftpActiveSocket
 	socket.host = host
 	socket.port = port
 	socket.logger = logger
+	socket.connected = goevent.NewEvent()
+	socket.connected.Set()
 	return socket, nil
 }
 
@@ -87,8 +94,13 @@ func (socket *ftpActiveSocket) Close() error {
 	return socket.conn.Close()
 }
 
+func (socket *ftpActiveSocket) Wait(timeout time.Duration) bool {
+	return socket.connected.WaitMax(timeout)
+}
+
 type ftpPassiveSocket struct {
 	conn        net.Conn
+	connected   *goevent.Event
 	host        string
 	port        int
 	ingress     chan []byte
@@ -105,6 +117,7 @@ func newPassiveSocket(logger *ftpLogger, passiveOpts *PassiveOpts, tlsConfig *tl
 	socket.logger = logger
 	socket.passiveOpts = passiveOpts
 	socket.tlsConfig = tlsConfig
+	socket.connected = goevent.NewEvent()
 
 	go socket.ListenAndServe()
 
@@ -157,6 +170,10 @@ func (socket *ftpPassiveSocket) Close() error {
 	}
 
 	return socket.conn.Close()
+}
+
+func (socket *ftpPassiveSocket) Wait(timeout time.Duration) bool {
+	return socket.connected.WaitMax(timeout)
 }
 
 func (socket *ftpPassiveSocket) listenHost() string {
@@ -234,6 +251,8 @@ func (socket *ftpPassiveSocket) ListenAndServe() {
 	} else {
 		socket.conn = tcpConn
 	}
+
+	socket.connected.Set()
 }
 
 func (socket *ftpPassiveSocket) waitForOpenSocket() bool {

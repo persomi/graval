@@ -272,7 +272,6 @@ func (cmd commandList) RequireAuth() bool {
 func (cmd commandList) Execute(conn *ftpConn, param string) {
 	path := conn.buildPath(param)
 	if files, ok := conn.driver.DirContents(path); ok {
-		conn.writeMessage(150, "Opening ASCII mode data connection for file list")
 		formatter := newListFormatter(files)
 		conn.sendOutofbandData(formatter.Detailed())
 	} else {
@@ -295,7 +294,6 @@ func (cmd commandNlst) RequireAuth() bool {
 func (cmd commandNlst) Execute(conn *ftpConn, param string) {
 	path := conn.buildPath(param)
 	if files, ok := conn.driver.DirContents(path); ok {
-		conn.writeMessage(150, "Opening ASCII mode data connection for file list")
 		formatter := newListFormatter(files)
 		conn.sendOutofbandData(formatter.Short())
 	} else {
@@ -607,7 +605,7 @@ func (cmd commandRetr) Execute(conn *ftpConn, param string) {
 
 	if reader, ok := conn.driver.GetFile(path); ok {
 		defer reader.Close()
-		conn.writeMessage(125, "Data connection already open. Transfer starting.")
+
 		conn.sendOutofbandReader(reader)
 	} else {
 		conn.writeMessage(551, "File not available")

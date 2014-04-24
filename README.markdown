@@ -21,6 +21,13 @@ Full documentation for the package is available on [godoc](http://godoc.org/gith
 To boot an FTP server you will need to provide a driver that speaks to your
 persistence layer - the required driver contract is listed below.
 
+Do not forget to seed math random in your main program. Otherwise passive ports will be predictable.
+
+    func main() {
+      rand.Seed(time.Now().UTC().UnixNano())
+      ...
+    }
+
 ### The Driver Contract
 
 Your driver MUST implement a number of simple methods. You can view the required

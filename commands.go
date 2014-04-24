@@ -98,7 +98,7 @@ func (cmd commandAuth) Execute(conn *ftpConn, param string) {
 		return
 	}
 
-	upper = strings.ToUpper(param)
+	upper := strings.ToUpper(param)
 
 	if upper == "TLS" || upper == "TLS-C" || upper == "SSL" || upper == "TLS-P" {
 		conn.writeMessage(234, fmt.Sprintf("AUTH %s successful.", param))
@@ -402,7 +402,7 @@ func (cmd commandOpts) RequireAuth() bool {
 }
 
 func (cmd commandOpts) Execute(conn *ftpConn, param string) {
-	upper = strings.ToUpper(param)
+	upper := strings.ToUpper(param)
 
 	if upper == "UTF8 ON" || upper == "UTF8" {
 		conn.writeMessage(200, "OK")
@@ -539,7 +539,7 @@ func (cmd commandProt) RequireAuth() bool {
 }
 
 func (cmd commandProt) Execute(conn *ftpConn, param string) {
-	upper = strings.ToUpper(param)
+	upper := strings.ToUpper(param)
 
 	if !conn.usingTls {
 		conn.writeMessage(503, "PROT not allowed on insecure control connection.")
@@ -781,7 +781,7 @@ func (cmd commandType) RequireAuth() bool {
 }
 
 func (cmd commandType) Execute(conn *ftpConn, param string) {
-	upper = strings.ToUpper(param)
+	upper := strings.ToUpper(param)
 
 	if upper == "A" {
 		conn.writeMessage(200, "Type set to ASCII")

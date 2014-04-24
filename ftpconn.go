@@ -137,6 +137,9 @@ func (ftpConn *ftpConn) receiveLine(line string) {
 
 func (ftpConn *ftpConn) parseLine(line string) (string, string) {
 	params := strings.SplitN(strings.Trim(line, "\r\n"), " ", 2)
+	if len(params) > 0 {
+		params[0] = strings.ToUpper(params[0])
+	}
 	if len(params) == 1 {
 		return params[0], ""
 	}

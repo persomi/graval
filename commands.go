@@ -98,7 +98,9 @@ func (cmd commandAuth) Execute(conn *ftpConn, param string) {
 		return
 	}
 
-	if param == "TLS" || param == "TLS-C" || param == "SSL" || param == "TLS-P" {
+	upper = strings.ToUpper(param)
+
+	if upper == "TLS" || upper == "TLS-C" || upper == "SSL" || upper == "TLS-P" {
 		conn.writeMessage(234, fmt.Sprintf("AUTH %s successful.", param))
 
 		conn.startTls()
@@ -400,7 +402,9 @@ func (cmd commandOpts) RequireAuth() bool {
 }
 
 func (cmd commandOpts) Execute(conn *ftpConn, param string) {
-	if param == "UTF8 ON" || param == "UTF8" {
+	upper = strings.ToUpper(param)
+
+	if upper == "UTF8 ON" || upper == "UTF8" {
 		conn.writeMessage(200, "OK")
 		return
 	}
@@ -535,18 +539,18 @@ func (cmd commandProt) RequireAuth() bool {
 }
 
 func (cmd commandProt) Execute(conn *ftpConn, param string) {
-	param = strings.ToUpper(param)
+	upper = strings.ToUpper(param)
 
 	if !conn.usingTls {
 		conn.writeMessage(503, "PROT not allowed on insecure control connection.")
 	} else if !conn.usingPbsz {
 		conn.writeMessage(503, "You must issue the PBSZ command prior to PROT.")
-	} else if param == "C" {
+	} else if upper == "C" {
 		conn.writeMessage(200, "Protection set to Clear")
-	} else if param == "P" {
+	} else if upper == "P" {
 		conn.writeMessage(200, "Protection set to Private")
 		conn.usingProt = true
-	} else if param == "S" || param == "E" {
+	} else if upper == "S" || upper == "E" {
 		conn.writeMessage(521, fmt.Sprintf("PROT %s unsupported (use C or P).", param))
 	} else {
 		conn.writeMessage(502, "Unrecognized PROT type (use C or P).")
@@ -777,9 +781,11 @@ func (cmd commandType) RequireAuth() bool {
 }
 
 func (cmd commandType) Execute(conn *ftpConn, param string) {
-	if strings.ToUpper(param) == "A" {
+	upper = strings.ToUpper(param)
+
+	if upper == "A" {
 		conn.writeMessage(200, "Type set to ASCII")
-	} else if strings.ToUpper(param) == "I" {
+	} else if upper == "I" {
 		conn.writeMessage(200, "Type set to binary")
 	} else {
 		conn.writeMessage(500, "Invalid type")

@@ -3,6 +3,7 @@ package graval
 import (
 	"fmt"
 	"log"
+	"strings"
 )
 
 // Use an instance of this to log in a standard format
@@ -33,5 +34,5 @@ func (logger *ftpLogger) PrintCommand(command string, params string) {
 }
 
 func (logger *ftpLogger) PrintResponse(code int, message string) {
-	log.Printf("%s < %d %s", logger.sessionId, code, message)
+	log.Printf("%s < %d %s", logger.sessionId, code, strings.Replace(message, "\r\n", "\\r\\n", -1))
 }

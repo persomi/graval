@@ -17,6 +17,7 @@ import (
 
 type CryptoConfig struct {
 	Implicit  bool
+	Force     bool
 	TlsConfig *tls.Config
 }
 

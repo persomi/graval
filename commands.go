@@ -802,6 +802,10 @@ func (cmd commandUser) RequireAuth() bool {
 }
 
 func (cmd commandUser) Execute(conn *ftpConn, param string) {
-	conn.reqUser = param
-	conn.writeMessage(331, "User name ok, password required")
+	if !conn.usingTls && conn.cryptoConfig.Force {
+		conn.writeMessage(534, "Policy Requires SSL")
+	} else {
+		conn.reqUser = param
+		conn.writeMessage(331, "User name ok, password required")
+	}
 }

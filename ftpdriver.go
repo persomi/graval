@@ -57,9 +57,9 @@ type FTPDriver interface {
 	// returns - true if the new directory was created
 	MakeDir(string) bool
 
-	// params  - path
+	// params  - path, position
 	// returns - a string containing the file data to send to the client
-	GetFile(string) (io.ReadCloser, bool)
+	GetFile(string, int64) (io.ReadCloser, bool)
 
 	// params  - desination path, an io.Reader containing the file data
 	// returns - true if the data was successfully persisted

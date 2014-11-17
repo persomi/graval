@@ -33,6 +33,8 @@ type ftpConn struct {
 	usingTls      bool
 	usingPbsz     bool
 	usingProt     bool
+	restPosition  int64
+	lastCmd       string
 }
 
 // NewftpConn constructs a new object that will handle the FTP protocol over
@@ -120,6 +122,7 @@ func (ftpConn *ftpConn) Close() {
 // appropriate response.
 func (ftpConn *ftpConn) receiveLine(line string) {
 	command, param := ftpConn.parseLine(line)
+	ftpConn.lastCmd = command
 	ftpConn.logger.PrintCommand(command, param)
 	cmdObj := commands[command]
 	if cmdObj == nil {

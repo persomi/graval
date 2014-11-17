@@ -39,6 +39,7 @@ var (
 		"PROT": commandProt{},
 		"PWD":  commandPwd{},
 		"QUIT": commandQuit{},
+		"REST": commandRest{},
 		"RETR": commandRetr{},
 		"RNFR": commandRnfr{},
 		"RNTO": commandRnto{},
@@ -184,6 +185,8 @@ func (cmd commandEprt) RequireAuth() bool {
 }
 
 func (cmd commandEprt) Execute(conn *ftpConn, param string) {
+	conn.restPosition = 0
+
 	delim := string(param[0:1])
 	parts := strings.Split(param, delim)
 	addressFamily, err := strconv.Atoi(parts[1])
@@ -219,6 +222,8 @@ func (cmd commandEpsv) RequireAuth() bool {
 }
 
 func (cmd commandEpsv) Execute(conn *ftpConn, param string) {
+	conn.restPosition = 0
+
 	socket, err := conn.newPassiveSocket()
 	if err != nil {
 		conn.writeMessage(425, "Data connection failed")
@@ -447,6 +452,8 @@ func (cmd commandPasv) RequireAuth() bool {
 }
 
 func (cmd commandPasv) Execute(conn *ftpConn, param string) {
+	conn.restPosition = 0
+
 	socket, err := conn.newPassiveSocket()
 	if err != nil {
 		conn.writeMessage(425, "Data connection failed")
@@ -507,6 +514,8 @@ func (cmd commandPort) RequireAuth() bool {
 }
 
 func (cmd commandPort) Execute(conn *ftpConn, param string) {
+	conn.restPosition = 0
+
 	nums := strings.Split(param, ",")
 	portOne, _ := strconv.Atoi(nums[4])
 	portTwo, _ := strconv.Atoi(nums[5])
@@ -588,6 +597,36 @@ func (cmd commandQuit) Execute(conn *ftpConn, param string) {
 	conn.Close()
 }
 
+// commandRest responds to the REST FTP command. It allows the client to
+// resume file download.
+type commandRest struct{}
+
+func (cmd commandRest) RequireParam() bool {
+	return true
+}
+
+func (cmd commandRest) RequireAuth() bool {
+	return true
+}
+
+func (cmd commandRest) Execute(conn *ftpConn, param string) {
+	if conn.lastCmd != "PORT" && conn.lastCmd != "EPRT" && conn.lastCmd != "PASV" && conn.lastCmd != "EPSV" {
+		conn.writeMessage(500, "REST must be called after PORT, EPRT, PASV or EPSV")
+		return
+	}
+
+	position, err := strconv.ParseInt(param, 10, 64)
+
+	if err != nil || position < 0 {
+		conn.writeMessage(500, "Invalid parameter")
+		return
+	}
+
+	conn.restPosition = position
+
+	conn.writeMessage(350, "Requested file action pending further information")
+}
+
 // commandRetr responds to the RETR FTP command. It allows the client to
 // download a file.
 type commandRetr struct{}
@@ -603,7 +642,7 @@ func (cmd commandRetr) RequireAuth() bool {
 func (cmd commandRetr) Execute(conn *ftpConn, param string) {
 	path := conn.buildPath(param)
 
-	if reader, ok := conn.driver.GetFile(path); ok {
+	if reader, ok := conn.driver.GetFile(path, conn.restPosition); ok {
 		defer reader.Close()
 
 		conn.sendOutofbandReader(reader)

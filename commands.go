@@ -610,11 +610,6 @@ func (cmd commandRest) RequireAuth() bool {
 }
 
 func (cmd commandRest) Execute(conn *ftpConn, param string) {
-	if conn.lastCmd != "PORT" && conn.lastCmd != "EPRT" && conn.lastCmd != "PASV" && conn.lastCmd != "EPSV" {
-		conn.writeMessage(500, "REST must be called after PORT, EPRT, PASV or EPSV")
-		return
-	}
-
 	position, err := strconv.ParseInt(param, 10, 64)
 
 	if err != nil || position < 0 {

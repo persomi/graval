@@ -17,6 +17,7 @@ type commandMap map[string]ftpCommand
 
 var (
 	commands = commandMap{
+		"ABOR": commandAbor{},
 		"ALLO": commandAllo{},
 		"AUTH": commandAuth{},
 		"CDUP": commandCdup{},
@@ -56,6 +57,23 @@ var (
 		"XRMD": commandRmd{},
 	}
 )
+
+// commandAbor responds to the ABOR FTP command.
+//
+// Aborts previous FTP command.
+type commandAbor struct{}
+
+func (cmd commandAbor) RequireParam() bool {
+	return false
+}
+
+func (cmd commandAbor) RequireAuth() bool {
+	return false
+}
+
+func (cmd commandAbor) Execute(conn *ftpConn, param string) {
+	conn.writeMessage(200, "OK")
+}
 
 // commandAllo responds to the ALLO FTP command.
 //

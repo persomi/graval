@@ -99,13 +99,35 @@ func (ftpConn *ftpConn) Serve() {
 	// send welcome
 	ftpConn.writeMessage(220, ftpConn.serverName)
 	// read commands
-	for {
-		line, err := ftpConn.controlReader.ReadString('\n')
-		if err != nil {
-			break
+
+	lineCh := make(chan string, 0)
+
+	go func() {
+		defer func() {
+			ftpConn.Close()
+			close(lineCh)
+		}()
+
+		for {
+			line, err := ftpConn.controlReader.ReadString('\n')
+			if err != nil {
+				ftpConn.logger.Printf("Error reading from control conn: %v", err)
+				return
+			} else {
+				select {
+				case lineCh <- line:
+					continue
+				case _ = <-time.After(10 * time.Second):
+					return
+				}
+			}
 		}
+	}()
+
+	for line := range lineCh {
 		ftpConn.receiveLine(line)
 	}
+
 	ftpConn.logger.Print("Connection Terminated")
 }
 

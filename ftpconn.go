@@ -87,13 +87,6 @@ func (ftpConn *ftpConn) setupReaderWriter() {
 // goroutine, so use this channel to be notified when the connection can be
 // cleaned up.
 func (ftpConn *ftpConn) Serve() {
-	defer func() {
-		if r := recover(); r != nil {
-			ftpConn.logger.Printf("Recovered in ftpConn Serve: %s", r)
-		}
-
-		ftpConn.Close()
-	}()
 
 	ftpConn.logger.Print("Connection Established")
 	// send welcome
@@ -104,6 +97,9 @@ func (ftpConn *ftpConn) Serve() {
 
 	go func() {
 		defer func() {
+			if r := recover(); r != nil {
+				ftpConn.logger.Printf("Recovered in ftpConn Serve: %s", r)
+			}
 			ftpConn.Close()
 			close(lineCh)
 		}()

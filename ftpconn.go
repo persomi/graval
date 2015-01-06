@@ -87,25 +87,43 @@ func (ftpConn *ftpConn) setupReaderWriter() {
 // goroutine, so use this channel to be notified when the connection can be
 // cleaned up.
 func (ftpConn *ftpConn) Serve() {
-	defer func() {
-		if r := recover(); r != nil {
-			ftpConn.logger.Printf("Recovered in ftpConn Serve: %s", r)
-		}
-
-		ftpConn.Close()
-	}()
 
 	ftpConn.logger.Print("Connection Established")
 	// send welcome
 	ftpConn.writeMessage(220, ftpConn.serverName)
 	// read commands
-	for {
-		line, err := ftpConn.controlReader.ReadString('\n')
-		if err != nil {
-			break
+
+	lineCh := make(chan string, 0)
+
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				ftpConn.logger.Printf("Recovered in ftpConn Serve: %s", r)
+			}
+			ftpConn.Close()
+			close(lineCh)
+		}()
+
+		for {
+			line, err := ftpConn.controlReader.ReadString('\n')
+			if err != nil {
+				ftpConn.logger.Printf("Error reading from control conn: %v", err)
+				return
+			} else {
+				select {
+				case lineCh <- line:
+					continue
+				case _ = <-time.After(10 * time.Second):
+					return
+				}
+			}
 		}
+	}()
+
+	for line := range lineCh {
 		ftpConn.receiveLine(line)
 	}
+
 	ftpConn.logger.Print("Connection Terminated")
 }
 

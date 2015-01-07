@@ -10,6 +10,7 @@ import (
 type ftpCommand interface {
 	RequireParam() bool
 	RequireAuth() bool
+	Async() bool
 	Execute(*ftpConn, string)
 }
 
@@ -71,6 +72,10 @@ func (cmd commandAbor) RequireAuth() bool {
 	return false
 }
 
+func (cmd commandAbor) Async() bool {
+	return true
+}
+
 func (cmd commandAbor) Execute(conn *ftpConn, param string) {
 	conn.writeMessage(200, "OK")
 }
@@ -89,6 +94,10 @@ func (cmd commandAllo) RequireAuth() bool {
 	return false
 }
 
+func (cmd commandAllo) Async() bool {
+	return true
+}
+
 func (cmd commandAllo) Execute(conn *ftpConn, param string) {
 	conn.writeMessage(202, "Obsolete")
 }
@@ -103,6 +112,10 @@ func (cmd commandAuth) RequireParam() bool {
 }
 
 func (cmd commandAuth) RequireAuth() bool {
+	return false
+}
+
+func (cmd commandAuth) Async() bool {
 	return false
 }
 
@@ -141,6 +154,10 @@ func (cmd commandCdup) RequireAuth() bool {
 	return true
 }
 
+func (cmd commandCdup) Async() bool {
+	return true
+}
+
 func (cmd commandCdup) Execute(conn *ftpConn, param string) {
 	otherCmd := &commandCwd{}
 	otherCmd.Execute(conn, "..")
@@ -155,6 +172,10 @@ func (cmd commandCwd) RequireParam() bool {
 }
 
 func (cmd commandCwd) RequireAuth() bool {
+	return true
+}
+
+func (cmd commandCwd) Async() bool {
 	return true
 }
 
@@ -180,6 +201,10 @@ func (cmd commandDele) RequireAuth() bool {
 	return false
 }
 
+func (cmd commandDele) Async() bool {
+	return true
+}
+
 func (cmd commandDele) Execute(conn *ftpConn, param string) {
 	path := conn.buildPath(param)
 	if conn.driver.DeleteFile(path) {
@@ -199,6 +224,10 @@ func (cmd commandEprt) RequireParam() bool {
 }
 
 func (cmd commandEprt) RequireAuth() bool {
+	return true
+}
+
+func (cmd commandEprt) Async() bool {
 	return true
 }
 
@@ -239,6 +268,10 @@ func (cmd commandEpsv) RequireAuth() bool {
 	return true
 }
 
+func (cmd commandEpsv) Async() bool {
+	return true
+}
+
 func (cmd commandEpsv) Execute(conn *ftpConn, param string) {
 	conn.restPosition = 0
 
@@ -262,6 +295,10 @@ func (cmd commandFeat) RequireParam() bool {
 
 func (cmd commandFeat) RequireAuth() bool {
 	return false
+}
+
+func (cmd commandFeat) Async() bool {
+	return true
 }
 
 func (cmd commandFeat) Execute(conn *ftpConn, param string) {
@@ -292,6 +329,10 @@ func (cmd commandList) RequireAuth() bool {
 	return true
 }
 
+func (cmd commandList) Async() bool {
+	return true
+}
+
 func (cmd commandList) Execute(conn *ftpConn, param string) {
 	path := conn.buildPath(param)
 	if files, ok := conn.driver.DirContents(path); ok {
@@ -311,6 +352,10 @@ func (cmd commandNlst) RequireParam() bool {
 }
 
 func (cmd commandNlst) RequireAuth() bool {
+	return true
+}
+
+func (cmd commandNlst) Async() bool {
 	return true
 }
 
@@ -336,6 +381,10 @@ func (cmd commandMdtm) RequireAuth() bool {
 	return true
 }
 
+func (cmd commandMdtm) Async() bool {
+	return true
+}
+
 func (cmd commandMdtm) Execute(conn *ftpConn, param string) {
 	path := conn.buildPath(param)
 	if time, ok := conn.driver.ModifiedTime(path); ok {
@@ -355,6 +404,10 @@ func (cmd commandMkd) RequireParam() bool {
 
 func (cmd commandMkd) RequireAuth() bool {
 	return false
+}
+
+func (cmd commandMkd) Async() bool {
+	return true
 }
 
 func (cmd commandMkd) Execute(conn *ftpConn, param string) {
@@ -382,6 +435,10 @@ func (cmd commandMode) RequireAuth() bool {
 	return true
 }
 
+func (cmd commandMode) Async() bool {
+	return true
+}
+
 func (cmd commandMode) Execute(conn *ftpConn, param string) {
 	if strings.ToUpper(param) == "S" {
 		conn.writeMessage(200, "OK")
@@ -404,6 +461,10 @@ func (cmd commandNoop) RequireAuth() bool {
 	return false
 }
 
+func (cmd commandNoop) Async() bool {
+	return true
+}
+
 func (cmd commandNoop) Execute(conn *ftpConn, param string) {
 	conn.writeMessage(200, "OK")
 }
@@ -419,6 +480,10 @@ func (cmd commandOpts) RequireParam() bool {
 }
 
 func (cmd commandOpts) RequireAuth() bool {
+	return true
+}
+
+func (cmd commandOpts) Async() bool {
 	return true
 }
 
@@ -445,6 +510,10 @@ func (cmd commandPass) RequireAuth() bool {
 	return false
 }
 
+func (cmd commandPass) Async() bool {
+	return true
+}
+
 func (cmd commandPass) Execute(conn *ftpConn, param string) {
 	if conn.driver.Authenticate(conn.reqUser, param) {
 		conn.user = conn.reqUser
@@ -466,6 +535,10 @@ func (cmd commandPasv) RequireParam() bool {
 }
 
 func (cmd commandPasv) RequireAuth() bool {
+	return true
+}
+
+func (cmd commandPasv) Async() bool {
 	return true
 }
 
@@ -508,6 +581,10 @@ func (cmd commandPbsz) RequireAuth() bool {
 	return false
 }
 
+func (cmd commandPbsz) Async() bool {
+	return true
+}
+
 func (cmd commandPbsz) Execute(conn *ftpConn, param string) {
 	if conn.usingTls {
 		conn.writeMessage(200, "PBSZ=0 successful.")
@@ -528,6 +605,10 @@ func (cmd commandPort) RequireParam() bool {
 }
 
 func (cmd commandPort) RequireAuth() bool {
+	return true
+}
+
+func (cmd commandPort) Async() bool {
 	return true
 }
 
@@ -563,6 +644,10 @@ func (cmd commandProt) RequireAuth() bool {
 	return false
 }
 
+func (cmd commandProt) Async() bool {
+	return true
+}
+
 func (cmd commandProt) Execute(conn *ftpConn, param string) {
 	upper := strings.ToUpper(param)
 
@@ -595,6 +680,10 @@ func (cmd commandPwd) RequireAuth() bool {
 	return true
 }
 
+func (cmd commandPwd) Async() bool {
+	return true
+}
+
 func (cmd commandPwd) Execute(conn *ftpConn, param string) {
 	conn.writeMessage(257, "\""+conn.namePrefix+"\" is the current directory")
 }
@@ -611,6 +700,10 @@ func (cmd commandQuit) RequireAuth() bool {
 	return false
 }
 
+func (cmd commandQuit) Async() bool {
+	return true
+}
+
 func (cmd commandQuit) Execute(conn *ftpConn, param string) {
 	conn.writeMessage(221, "Goodbye.")
 	conn.Close()
@@ -625,6 +718,10 @@ func (cmd commandRest) RequireParam() bool {
 }
 
 func (cmd commandRest) RequireAuth() bool {
+	return true
+}
+
+func (cmd commandRest) Async() bool {
 	return true
 }
 
@@ -653,6 +750,10 @@ func (cmd commandRetr) RequireAuth() bool {
 	return true
 }
 
+func (cmd commandRetr) Async() bool {
+	return true
+}
+
 func (cmd commandRetr) Execute(conn *ftpConn, param string) {
 	path := conn.buildPath(param)
 
@@ -677,6 +778,10 @@ func (cmd commandRnfr) RequireAuth() bool {
 	return false
 }
 
+func (cmd commandRnfr) Async() bool {
+	return true
+}
+
 func (cmd commandRnfr) Execute(conn *ftpConn, param string) {
 	conn.renameFrom = conn.buildPath(param)
 	conn.writeMessage(350, "Requested file action pending further information.")
@@ -692,6 +797,10 @@ func (cmd commandRnto) RequireParam() bool {
 
 func (cmd commandRnto) RequireAuth() bool {
 	return false
+}
+
+func (cmd commandRnto) Async() bool {
+	return true
 }
 
 func (cmd commandRnto) Execute(conn *ftpConn, param string) {
@@ -715,6 +824,10 @@ func (cmd commandRmd) RequireAuth() bool {
 	return false
 }
 
+func (cmd commandRmd) Async() bool {
+	return true
+}
+
 func (cmd commandRmd) Execute(conn *ftpConn, param string) {
 	path := conn.buildPath(param)
 	if conn.driver.DeleteDir(path) {
@@ -733,6 +846,10 @@ func (cmd commandSize) RequireParam() bool {
 }
 
 func (cmd commandSize) RequireAuth() bool {
+	return true
+}
+
+func (cmd commandSize) Async() bool {
 	return true
 }
 
@@ -755,6 +872,10 @@ func (cmd commandStor) RequireParam() bool {
 }
 
 func (cmd commandStor) RequireAuth() bool {
+	return true
+}
+
+func (cmd commandStor) Async() bool {
 	return true
 }
 
@@ -788,6 +909,10 @@ func (cmd commandStru) RequireAuth() bool {
 	return true
 }
 
+func (cmd commandStru) Async() bool {
+	return true
+}
+
 func (cmd commandStru) Execute(conn *ftpConn, param string) {
 	if strings.ToUpper(param) == "F" {
 		conn.writeMessage(200, "OK")
@@ -804,6 +929,10 @@ func (cmd commandSyst) RequireParam() bool {
 }
 
 func (cmd commandSyst) RequireAuth() bool {
+	return true
+}
+
+func (cmd commandSyst) Async() bool {
 	return true
 }
 
@@ -831,6 +960,10 @@ func (cmd commandType) RequireAuth() bool {
 	return true
 }
 
+func (cmd commandType) Async() bool {
+	return true
+}
+
 func (cmd commandType) Execute(conn *ftpConn, param string) {
 	upper := strings.ToUpper(param)
 
@@ -852,6 +985,10 @@ func (cmd commandUser) RequireParam() bool {
 
 func (cmd commandUser) RequireAuth() bool {
 	return false
+}
+
+func (cmd commandUser) Async() bool {
+	return true
 }
 
 func (cmd commandUser) Execute(conn *ftpConn, param string) {

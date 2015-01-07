@@ -18,50 +18,50 @@ type FTPDriverFactory interface {
 type FTPDriver interface {
 	// params  - username, password
 	// returns - true if the provided details are valid
-	Authenticate(string, string) bool
+	Authenticate(username string, password string) bool
 
 	// params  - a file path
 	// returns - an int with the number of bytes in the file or -1 if the file
 	//           doesn't exist
-	Bytes(string) int64
+	Bytes(path string) int64
 
 	// params  - a file path
 	// returns - a time indicating when the requested path was last modified
 	//         - an ok flag if the file doesn't exist or the user lacks
 	//           permissions
-	ModifiedTime(string) (time.Time, bool)
+	ModifiedTime(path string) (time.Time, bool)
 
 	// params  - path
 	// returns - true if the current user is permitted to change to the
 	//           requested path
-	ChangeDir(string) bool
+	ChangeDir(path string) bool
 
 	// params  - path
 	// returns - a collection of items describing the contents of the requested
 	//           path
-	DirContents(string) ([]os.FileInfo, bool)
+	DirContents(path string) ([]os.FileInfo, bool)
 
 	// params  - path
 	// returns - true if the directory was deleted
-	DeleteDir(string) bool
+	DeleteDir(path string) bool
 
 	// params  - path
 	// returns - true if the file was deleted
-	DeleteFile(string) bool
+	DeleteFile(path string) bool
 
 	// params  - from_path, to_path
 	// returns - true if the file was renamed
-	Rename(string, string) bool
+	Rename(from_path string, to_path string) bool
 
 	// params  - path
 	// returns - true if the new directory was created
-	MakeDir(string) bool
+	MakeDir(path string) bool
 
 	// params  - path, position
 	// returns - a string containing the file data to send to the client
-	GetFile(string, int64) (io.ReadCloser, bool)
+	GetFile(path string, position int64) (io.ReadCloser, bool)
 
 	// params  - desination path, an io.Reader containing the file data
 	// returns - true if the data was successfully persisted
-	PutFile(string, io.Reader) bool
+	PutFile(path string, reader io.Reader) bool
 }

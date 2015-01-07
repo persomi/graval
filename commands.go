@@ -399,11 +399,11 @@ func (cmd commandMdtm) Execute(conn *ftpConn, param string) {
 type commandMkd struct{}
 
 func (cmd commandMkd) RequireParam() bool {
-	return false
+	return true
 }
 
 func (cmd commandMkd) RequireAuth() bool {
-	return false
+	return true
 }
 
 func (cmd commandMkd) Async() bool {

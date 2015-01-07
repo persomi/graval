@@ -12,6 +12,7 @@ import (
 	"net"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -81,6 +82,11 @@ func (ftpConn *ftpConn) setupReaderWriter() {
 	ftpConn.controlWriter = bufio.NewWriter(ftpConn.conn)
 }
 
+type BoundCommand struct {
+	CmdObj ftpCommand
+	Param  string
+}
+
 // Serve starts an endless loop that reads FTP commands from the client and
 // responds appropriately. terminated is a channel that will receive a true
 // message when the connection closes. This loop will be running inside a
@@ -93,7 +99,9 @@ func (ftpConn *ftpConn) Serve() {
 	ftpConn.writeMessage(220, ftpConn.serverName)
 	// read commands
 
-	lineCh := make(chan string, 0)
+	var readMutex sync.RWMutex
+
+	cmdCh := make(chan *BoundCommand, 0)
 
 	go func() {
 		defer func() {
@@ -101,27 +109,40 @@ func (ftpConn *ftpConn) Serve() {
 				ftpConn.logger.Printf("Recovered in ftpConn Serve: %s", r)
 			}
 			ftpConn.Close()
-			close(lineCh)
+			close(cmdCh)
 		}()
 
 		for {
+			readMutex.RLock()
 			line, err := ftpConn.controlReader.ReadString('\n')
+			readMutex.RUnlock()
 			if err != nil {
 				ftpConn.logger.Printf("Error reading from control conn: %v", err)
 				return
 			} else {
-				select {
-				case lineCh <- line:
-					continue
-				case _ = <-time.After(10 * time.Second):
-					return
+				cmdObj := ftpConn.receiveLine(line)
+				if cmdObj != nil {
+					if !cmdObj.CmdObj.Async() {
+						readMutex.Lock()
+					}
+					select {
+					case cmdCh <- cmdObj:
+						continue
+					case _ = <-time.After(10 * time.Second):
+						return
+					}
 				}
+
 			}
 		}
 	}()
 
-	for line := range lineCh {
-		ftpConn.receiveLine(line)
+	for cmd := range cmdCh {
+		cmd.CmdObj.Execute(ftpConn, cmd.Param)
+
+		if !cmd.CmdObj.Async() {
+			readMutex.Unlock()
+		}
 	}
 
 	ftpConn.logger.Print("Connection Terminated")
@@ -135,9 +156,29 @@ func (ftpConn *ftpConn) Close() {
 	}
 }
 
+func (ftpConn *ftpConn) receiveLine(line string) (cmd *BoundCommand) {
+	command, param := ftpConn.parseLine(line)
+	ftpConn.logger.PrintCommand(command, param)
+	cmdObj := commands[command]
+	if cmdObj == nil {
+		ftpConn.writeMessage(500, "Command not found")
+		return
+	}
+	if cmdObj.RequireParam() && param == "" {
+		ftpConn.writeMessage(553, "action aborted, required param missing")
+		return
+	} else if cmdObj.RequireAuth() && ftpConn.user == "" {
+		ftpConn.writeMessage(530, "not logged in")
+		return
+	} else {
+		cmd = &BoundCommand{cmdObj, param}
+		return
+	}
+}
+
 // receiveLine accepts a single line FTP command and co-ordinates an
 // appropriate response.
-func (ftpConn *ftpConn) receiveLine(line string) {
+func (ftpConn *ftpConn) receiveLineOld(line string) {
 	command, param := ftpConn.parseLine(line)
 	ftpConn.logger.PrintCommand(command, param)
 	cmdObj := commands[command]

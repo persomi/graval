@@ -255,7 +255,7 @@ func (ftpConn *ftpConn) buildPath(filename string) (fullPath string) {
 	return
 }
 
-// sendOutofbandData will copy data from reader to the client via the currently
+// sendOutofbandReader will copy data from reader to the client via the currently
 // open data socket. Assumes the socket is open and ready to be used.
 func (ftpConn *ftpConn) sendOutofbandReader(reader io.Reader) {
 	defer func() {

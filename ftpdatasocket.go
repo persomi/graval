@@ -227,6 +227,8 @@ func (socket *ftpPassiveSocket) ListenAndServe() {
 		break
 	}
 
+	defer listener.Close()
+
 	addr := listener.Addr()
 
 	parts := strings.Split(addr.String(), ":")

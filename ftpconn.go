@@ -176,25 +176,6 @@ func (ftpConn *ftpConn) receiveLine(line string) (cmd *BoundCommand) {
 	}
 }
 
-// receiveLine accepts a single line FTP command and co-ordinates an
-// appropriate response.
-func (ftpConn *ftpConn) receiveLineOld(line string) {
-	command, param := ftpConn.parseLine(line)
-	ftpConn.logger.PrintCommand(command, param)
-	cmdObj := commands[command]
-	if cmdObj == nil {
-		ftpConn.writeMessage(500, "Command not found")
-		return
-	}
-	if cmdObj.RequireParam() && param == "" {
-		ftpConn.writeMessage(553, "action aborted, required param missing")
-	} else if cmdObj.RequireAuth() && ftpConn.user == "" {
-		ftpConn.writeMessage(530, "not logged in")
-	} else {
-		cmdObj.Execute(ftpConn, param)
-	}
-}
-
 func (ftpConn *ftpConn) parseLine(line string) (string, string) {
 	params := strings.SplitN(strings.Trim(line, "\r\n"), " ", 2)
 	if len(params) > 0 {

@@ -7,8 +7,7 @@ import (
 	"github.com/koofr/goevent"
 	"math/rand"
 	"net"
-	"strconv"
-	"strings"
+	"sync"
 	"time"
 )
 
@@ -99,39 +98,41 @@ func (socket *ftpActiveSocket) Wait(timeout time.Duration) bool {
 }
 
 type ftpPassiveSocket struct {
-	conn        net.Conn
-	connected   *goevent.Event
-	host        string
-	port        int
-	logger      *ftpLogger
-	passiveOpts *PassiveOpts
-	tlsConfig   *tls.Config
+	listener      net.Listener
+	listenerMutex *sync.RWMutex
+	conn          net.Conn
+	connMutex     *sync.RWMutex
+	connected     *goevent.Event
+	host          string
+	port          int
+	logger        *ftpLogger
+	passiveOpts   *PassiveOpts
+	tlsConfig     *tls.Config
 }
 
 func newPassiveSocket(logger *ftpLogger, passiveOpts *PassiveOpts, tlsConfig *tls.Config) (*ftpPassiveSocket, error) {
-	socket := new(ftpPassiveSocket)
-	socket.logger = logger
-	socket.passiveOpts = passiveOpts
-	socket.tlsConfig = tlsConfig
-	socket.connected = goevent.NewEvent()
-
-	go socket.ListenAndServe()
-
-	retries := 100
-
-	for {
-		if socket.Port() > 0 {
-			break
-		}
-
-		retries -= 1
-
-		if retries == 0 {
-			return nil, fmt.Errorf("newPassiveSocket socket port not found")
-		}
-
-		time.Sleep(100 * time.Millisecond)
+	socket := &ftpPassiveSocket{
+		listener:      nil,
+		listenerMutex: &sync.RWMutex{},
+		conn:          nil,
+		connMutex:     &sync.RWMutex{},
+		connected:     goevent.NewEvent(),
+		host:          "",
+		port:          0,
+		logger:        logger,
+		passiveOpts:   passiveOpts,
+		tlsConfig:     tlsConfig,
 	}
+
+	listener, err := socket.createListener()
+
+	if err != nil {
+		return nil, fmt.Errorf("newPassiveSocket socket could not be created: %s", err)
+	}
+
+	socket.listener = listener
+
+	go socket.acceptConnection()
 
 	return socket, nil
 }
@@ -161,11 +162,22 @@ func (socket *ftpPassiveSocket) Write(p []byte) (n int, err error) {
 func (socket *ftpPassiveSocket) Close() error {
 	socket.logger.Print("closing passive data socket")
 
-	if socket.conn == nil {
+	socket.listenerMutex.Lock()
+	if socket.listener != nil {
+		socket.listener.Close()
+		socket.listener = nil
+	}
+	socket.listenerMutex.Unlock()
+
+	socket.connMutex.RLock()
+	conn := socket.conn
+	socket.connMutex.RUnlock()
+
+	if conn == nil {
 		return nil
 	}
 
-	return socket.conn.Close()
+	return conn.Close()
 }
 
 func (socket *ftpPassiveSocket) Wait(timeout time.Duration) bool {
@@ -191,15 +203,13 @@ func (socket *ftpPassiveSocket) randomPort() int {
 	}
 }
 
-func (socket *ftpPassiveSocket) ListenAndServe() {
+func (socket *ftpPassiveSocket) createListener() (listener *net.TCPListener, err error) {
 	laddr, err := net.ResolveTCPAddr("tcp", socket.listenHost()+":0")
 
 	if err != nil {
 		socket.logger.Print(err)
 		return
 	}
-
-	var listener *net.TCPListener
 
 	retries := 100
 
@@ -223,21 +233,31 @@ func (socket *ftpPassiveSocket) ListenAndServe() {
 		break
 	}
 
-	defer listener.Close()
+	addr := listener.Addr().(*net.TCPAddr)
 
-	addr := listener.Addr()
+	socket.host = addr.IP.String()
+	socket.port = addr.Port
 
-	parts := strings.Split(addr.String(), ":")
+	return
+}
 
-	socket.host = parts[0]
+func (socket *ftpPassiveSocket) acceptConnection() {
+	socket.listenerMutex.RLock()
+	listener := socket.listener
+	socket.listenerMutex.RUnlock()
 
-	port, err := strconv.Atoi(parts[1])
-
-	if err == nil {
-		socket.port = port
+	if listener == nil {
+		return
 	}
 
-	tcpConn, err := listener.AcceptTCP()
+	var conn net.Conn
+
+	conn, err := listener.Accept()
+
+	socket.listenerMutex.Lock()
+	listener.Close()
+	socket.listener = nil
+	socket.listenerMutex.Unlock()
 
 	if err != nil {
 		socket.logger.Print(err)
@@ -245,26 +265,16 @@ func (socket *ftpPassiveSocket) ListenAndServe() {
 	}
 
 	if socket.tlsConfig != nil {
-		socket.conn = tls.Server(tcpConn, socket.tlsConfig)
-	} else {
-		socket.conn = tcpConn
+		conn = tls.Server(conn, socket.tlsConfig)
 	}
+
+	socket.connMutex.Lock()
+	socket.conn = conn
+	socket.connMutex.Unlock()
 
 	socket.connected.Set()
 }
 
 func (socket *ftpPassiveSocket) waitForOpenSocket() bool {
-	retries := 0
-	for {
-		if socket.conn != nil {
-			break
-		}
-		if retries > 3 {
-			return false
-		}
-		socket.logger.Print("sleeping, socket isn't open")
-		time.Sleep(500 * time.Millisecond)
-		retries += 1
-	}
-	return true
+	return socket.connected.WaitMax(2 * time.Second)
 }

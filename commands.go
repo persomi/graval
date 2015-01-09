@@ -3,8 +3,10 @@ package graval
 import (
 	"fmt"
 	"github.com/jehiah/go-strftime"
+	"github.com/koofr/go-ioutils"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type ftpCommand interface {
@@ -882,8 +884,17 @@ func (cmd commandStor) Async() bool {
 
 func (cmd commandStor) Execute(conn *ftpConn, param string) {
 	targetPath := conn.buildPath(param)
-	conn.writeMessage(150, "Data transfer starting")
-	if ok := conn.driver.PutFile(targetPath, conn.dataConn); ok {
+
+	if !conn.DataConnWait(10 * time.Second) {
+		conn.writeMessage(425, "Can't open data connection.")
+		return
+	}
+
+	reader := ioutils.NewStartReader(conn.dataConn, func() {
+		conn.writeMessage(150, "Data transfer starting")
+	})
+
+	if ok := conn.driver.PutFile(targetPath, reader); ok {
 		conn.writeMessage(226, "Transfer complete.")
 	} else {
 		conn.writeMessage(450, "error during transfer")

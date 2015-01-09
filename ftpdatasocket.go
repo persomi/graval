@@ -103,8 +103,6 @@ type ftpPassiveSocket struct {
 	connected   *goevent.Event
 	host        string
 	port        int
-	ingress     chan []byte
-	egress      chan []byte
 	logger      *ftpLogger
 	passiveOpts *PassiveOpts
 	tlsConfig   *tls.Config
@@ -112,8 +110,6 @@ type ftpPassiveSocket struct {
 
 func newPassiveSocket(logger *ftpLogger, passiveOpts *PassiveOpts, tlsConfig *tls.Config) (*ftpPassiveSocket, error) {
 	socket := new(ftpPassiveSocket)
-	socket.ingress = make(chan []byte)
-	socket.egress = make(chan []byte)
 	socket.logger = logger
 	socket.passiveOpts = passiveOpts
 	socket.tlsConfig = tlsConfig

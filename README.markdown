@@ -1,6 +1,6 @@
 # graval
 
-An experimental FTP server framework. By providing a simple driver class that
+Go FTP server framework. By providing a simple driver class that
 responds to a handful of methods you can have a complete FTP server.
 
 Some sample use cases include persisting data to:

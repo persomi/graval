@@ -117,7 +117,6 @@ func (ftpConn *ftpConn) Serve() {
 			line, err := ftpConn.controlReader.ReadString('\n')
 			readMutex.RUnlock()
 			if err != nil {
-				ftpConn.logger.Printf("Error reading from control conn: %v", err)
 				return
 			} else {
 				cmdObj := ftpConn.receiveLine(line)

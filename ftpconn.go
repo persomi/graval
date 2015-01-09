@@ -94,7 +94,7 @@ type BoundCommand struct {
 // cleaned up.
 func (ftpConn *ftpConn) Serve() {
 
-	ftpConn.logger.Print("Connection Established")
+	ftpConn.logger.Printf("Connection Established (%s)", ftpConn.conn.RemoteAddr())
 	// send welcome
 	ftpConn.writeMessage(220, ftpConn.serverName)
 	// read commands

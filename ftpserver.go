@@ -43,6 +43,9 @@ type FTPServerOpts struct {
 
 	// Options for FTPS and FTPES
 	CryptoConfig *CryptoConfig
+
+	// Disable logging (useful for tests)
+	Quiet bool
 }
 
 // FTPServer is the root of your FTP application. You should instantiate one
@@ -55,6 +58,7 @@ type FTPServer struct {
 	listener      net.Listener
 	closed        bool
 	driverFactory FTPDriverFactory
+	quiet         bool
 	logger        *ftpLogger
 	passiveOpts   *PassiveOpts
 	cryptoConfig  *CryptoConfig
@@ -97,6 +101,8 @@ func serverOptsWithDefaults(opts *FTPServerOpts) *FTPServerOpts {
 
 	newOpts.CryptoConfig = opts.CryptoConfig
 
+	newOpts.Quiet = opts.Quiet
+
 	return &newOpts
 }
 
@@ -123,7 +129,8 @@ func NewFTPServer(opts *FTPServerOpts) *FTPServer {
 	s.listenTo = buildTcpString(opts.Hostname, opts.Port)
 	s.serverName = opts.ServerName
 	s.driverFactory = opts.Factory
-	s.logger = newFtpLogger("")
+	s.quiet = opts.Quiet
+	s.logger = newFtpLogger("", s.quiet)
 	s.passiveOpts = opts.PassiveOpts
 	s.cryptoConfig = opts.CryptoConfig
 	return s
@@ -162,7 +169,7 @@ func (ftpServer *FTPServer) ListenAndServe() error {
 		if err != nil {
 			ftpServer.logger.Print("Error creating driver, aborting client connection")
 		} else {
-			ftpConn := newftpConn(tcpConn, driver, ftpServer.serverName, ftpServer.passiveOpts, ftpServer.cryptoConfig)
+			ftpConn := newftpConn(tcpConn, driver, ftpServer.serverName, ftpServer.passiveOpts, ftpServer.cryptoConfig, ftpServer.quiet)
 			go ftpConn.Serve()
 		}
 	}

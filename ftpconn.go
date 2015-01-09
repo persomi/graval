@@ -41,13 +41,13 @@ type ftpConn struct {
 // an active net.TCPConn. The TCP connection should already be open before
 // it is handed to this functions. driver is an instance of FTPDriver that
 // will handle all auth and persistence details.
-func newftpConn(tcpConn *net.TCPConn, driver FTPDriver, serverName string, passiveOpts *PassiveOpts, cryptoConfig *CryptoConfig) *ftpConn {
+func newftpConn(tcpConn *net.TCPConn, driver FTPDriver, serverName string, passiveOpts *PassiveOpts, cryptoConfig *CryptoConfig, quiet bool) *ftpConn {
 	c := new(ftpConn)
 	c.namePrefix = "/"
 	c.conn = tcpConn
 	c.driver = driver
 	c.sessionId = newSessionId()
-	c.logger = newFtpLogger(c.sessionId)
+	c.logger = newFtpLogger(c.sessionId, quiet)
 	c.passiveOpts = passiveOpts
 	c.cryptoConfig = cryptoConfig
 	c.serverName = serverName

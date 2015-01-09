@@ -660,6 +660,7 @@ func (cmd commandProt) Execute(conn *ftpConn, param string) {
 		conn.writeMessage(503, "You must issue the PBSZ command prior to PROT.")
 	} else if upper == "C" {
 		conn.writeMessage(200, "Protection set to Clear")
+		conn.usingProt = false
 	} else if upper == "P" {
 		conn.writeMessage(200, "Protection set to Private")
 		conn.usingProt = true

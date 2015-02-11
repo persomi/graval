@@ -8,6 +8,7 @@ import (
 	"github.com/jehiah/go-strftime"
 	"github.com/koofr/go-netutils"
 	. "github.com/koofr/graval"
+	"github.com/koofr/graval/memory"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"io"
@@ -15,199 +16,11 @@ import (
 	"net"
 	"net/textproto"
 	"os"
-	"path/filepath"
-	"sort"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
 )
-
-type testFile struct {
-	file    os.FileInfo
-	content []byte
-}
-
-type filesSorter struct {
-	files []os.FileInfo
-}
-
-func (s *filesSorter) Len() int {
-	return len(s.files)
-}
-
-func (s *filesSorter) Swap(i, j int) {
-	s.files[i], s.files[j] = s.files[j], s.files[i]
-}
-
-func (s *filesSorter) Less(i, j int) bool {
-	return s.files[i].Name() < s.files[j].Name()
-}
-
-type testDriverFactory struct {
-	files map[string]*testFile
-}
-
-func (f *testDriverFactory) NewDriver() (d FTPDriver, err error) {
-	return &testDriver{
-		files: f.files,
-	}, nil
-}
-
-type testDriver struct {
-	files map[string]*testFile
-}
-
-func (d *testDriver) Authenticate(username string, password string) bool {
-	return username == "user" && password == "password"
-}
-
-func (d *testDriver) Bytes(path string) int64 {
-	if f, ok := d.files[path]; ok {
-		return f.file.Size()
-	} else {
-		return -1
-	}
-}
-
-func (d *testDriver) ModifiedTime(path string) (time.Time, bool) {
-	if f, ok := d.files[path]; ok {
-		return f.file.ModTime(), true
-	} else {
-		return time.Now(), false
-	}
-}
-
-func (d *testDriver) ChangeDir(path string) bool {
-	if f, ok := d.files[path]; ok && f.file.IsDir() {
-		return true
-	} else {
-		return false
-	}
-}
-
-func (d *testDriver) DirContents(path string) ([]os.FileInfo, bool) {
-	if f, ok := d.files[path]; ok && f.file.IsDir() {
-		files := make([]os.FileInfo, 0)
-
-		if path == "/" {
-			path = ""
-		}
-
-		for p, f := range d.files {
-			if strings.HasPrefix(p, path+"/") && p[len(path)+1:] != "" && !strings.Contains(p[len(path)+1:], "/") {
-				files = append(files, f.file)
-			}
-		}
-
-		sort.Sort(&filesSorter{files})
-
-		return files, true
-	} else {
-		return nil, false
-	}
-}
-
-func (d *testDriver) DeleteDir(path string) bool {
-	if f, ok := d.files[path]; ok && f.file.IsDir() {
-		haschildren := false
-		for p, _ := range d.files {
-			if strings.HasPrefix(p, path+"/") {
-				haschildren = true
-				break
-			}
-		}
-
-		if haschildren {
-			return false
-		}
-
-		delete(d.files, path)
-
-		return true
-	} else {
-		return false
-	}
-}
-
-func (d *testDriver) DeleteFile(path string) bool {
-	if f, ok := d.files[path]; ok && !f.file.IsDir() {
-		delete(d.files, path)
-		return true
-	} else {
-		return false
-	}
-}
-
-func (d *testDriver) Rename(from_path string, to_path string) bool {
-	if f, from_path_exists := d.files[from_path]; from_path_exists {
-		if _, to_path_exists := d.files[to_path]; !to_path_exists {
-			if _, to_path_parent_exists := d.files[filepath.Dir(to_path)]; to_path_parent_exists {
-				if f.file.IsDir() {
-					delete(d.files, from_path)
-					d.files[to_path] = &testFile{NewDirItem(filepath.Base(to_path)), nil}
-					torename := make([]string, 0)
-					for p, _ := range d.files {
-						if strings.HasPrefix(p, from_path+"/") {
-							torename = append(torename, p)
-						}
-					}
-					for _, p := range torename {
-						sf := d.files[p]
-						delete(d.files, p)
-						np := to_path + p[len(from_path):]
-						d.files[np] = sf
-					}
-				} else {
-					delete(d.files, from_path)
-					d.files[to_path] = &testFile{NewFileItem(filepath.Base(to_path), f.file.Size(), f.file.ModTime()), f.content}
-				}
-				return true
-			} else {
-				return false
-			}
-		} else {
-			return false
-		}
-	} else {
-		return false
-	}
-}
-
-func (d *testDriver) MakeDir(path string) bool {
-	if _, ok := d.files[path]; ok {
-		return false
-	} else {
-		d.files[path] = &testFile{NewDirItem(filepath.Base(path)), nil}
-		return true
-	}
-}
-
-func (d *testDriver) GetFile(path string, position int64) (io.ReadCloser, bool) {
-	if f, ok := d.files[path]; ok && !f.file.IsDir() {
-		return ioutil.NopCloser(bytes.NewReader(f.content[position:])), true
-	} else {
-		return nil, false
-	}
-}
-
-func (d *testDriver) PutFile(path string, reader io.Reader) bool {
-	if _, path_exists := d.files[path]; !path_exists {
-		if _, path_parent_exists := d.files[filepath.Dir(path)]; path_parent_exists {
-			bytes, err := ioutil.ReadAll(reader)
-			if err != nil {
-				return false
-			}
-
-			d.files[path] = &testFile{NewFileItem(filepath.Base(path), int64(len(bytes)), time.Now().UTC()), bytes}
-
-			return true
-		} else {
-			return false
-		}
-	} else {
-		return false
-	}
-}
 
 func generateCert() (cert *tls.Certificate, err error) {
 	organization := "Test"
@@ -241,7 +54,7 @@ type testVariant struct {
 var _ = Describe("Graval", func() {
 	var host string = "127.0.0.1"
 	var addr string
-	var files map[string]*testFile
+	var files map[string]*memory.MemoryFile
 	var server *FTPServer
 	var clientConn net.Conn
 	var c *textproto.Conn
@@ -619,14 +432,14 @@ var _ = Describe("Graval", func() {
 				port, err := netutils.UnusedPort()
 				Expect(err).NotTo(HaveOccurred())
 
-				files = map[string]*testFile{
-					"/":           &testFile{NewDirItem(""), nil},
-					"/dir":        &testFile{NewDirItem("dir"), nil},
-					"/dir/subdir": &testFile{NewDirItem("subdir"), nil},
-					"/file":       &testFile{NewFileItem("file", 42, time.Date(2015, 1, 7, 14, 21, 0, 0, time.UTC)), make([]byte, 42)},
+				files = map[string]*memory.MemoryFile{
+					"/":           &memory.MemoryFile{NewDirItem(""), nil},
+					"/dir":        &memory.MemoryFile{NewDirItem("dir"), nil},
+					"/dir/subdir": &memory.MemoryFile{NewDirItem("subdir"), nil},
+					"/file":       &memory.MemoryFile{NewFileItem("file", 42, time.Date(2015, 1, 7, 14, 21, 0, 0, time.UTC)), make([]byte, 42)},
 				}
 
-				factory := &testDriverFactory{files}
+				factory := &memory.MemoryDriverFactory{files, "user", "password"}
 
 				server = NewFTPServer(&FTPServerOpts{
 					ServerName: "Test FTP server",
@@ -928,7 +741,7 @@ var _ = Describe("Graval", func() {
 							"drw-rw-rw- 1 owner group            0 %s dir\r\n"+
 								"-rw-rw-rw- 1 owner group           42 Jan 07 14:21 file\r\n"+
 								"\r\n",
-							strftime.Format("%b %d %H:%M", files["/dir"].file.ModTime()))))
+							strftime.Format("%b %d %H:%M", files["/dir"].File.ModTime()))))
 					})
 
 					It("LIST dir", func() {
@@ -940,7 +753,7 @@ var _ = Describe("Graval", func() {
 						Expect(string(bytes)).To(Equal(fmt.Sprintf(
 							"drw-rw-rw- 1 owner group            0 %s subdir\r\n"+
 								"\r\n",
-							strftime.Format("%b %d %H:%M", files["/dir/subdir"].file.ModTime()))))
+							strftime.Format("%b %d %H:%M", files["/dir/subdir"].File.ModTime()))))
 					})
 
 					It("LIST nonexisting", func() {
@@ -984,7 +797,7 @@ var _ = Describe("Graval", func() {
 
 					It("MDTM dir", func() {
 						login()
-						res("MDTM dir")(213, strftime.Format("%Y%m%d%H%M%S", files["/dir"].file.ModTime()))
+						res("MDTM dir")(213, strftime.Format("%Y%m%d%H%M%S", files["/dir"].File.ModTime()))
 					})
 				})
 

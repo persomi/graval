@@ -99,7 +99,15 @@ func serverOptsWithDefaults(opts *FTPServerOpts) *FTPServerOpts {
 		newOpts.PassiveOpts = opts.PassiveOpts
 	}
 
-	newOpts.CryptoConfig = opts.CryptoConfig
+	if opts.CryptoConfig == nil {
+		newOpts.CryptoConfig = &CryptoConfig{
+			Implicit:  false,
+			Force:     false,
+			TlsConfig: nil,
+		}
+	} else {
+		newOpts.CryptoConfig = opts.CryptoConfig
+	}
 
 	newOpts.Quiet = opts.Quiet
 

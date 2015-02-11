@@ -16,6 +16,10 @@ Full documentation for the package is available on [godoc](http://godoc.org/gith
 
     go get github.com/koofr/graval
 
+## Example
+
+    go run example/example.go
+
 ## Usage
 
 To boot an FTP server you will need to provide a driver that speaks to your

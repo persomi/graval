@@ -21,6 +21,7 @@ type ftpConn struct {
 	controlReader *bufio.Reader
 	controlWriter *bufio.Writer
 	dataConn      ftpDataSocket
+	dataConnMutex *sync.RWMutex
 	driver        FTPDriver
 	logger        *ftpLogger
 	passiveOpts   *PassiveOpts
@@ -45,6 +46,7 @@ func newftpConn(tcpConn *net.TCPConn, driver FTPDriver, serverName string, passi
 	c := new(ftpConn)
 	c.namePrefix = "/"
 	c.conn = tcpConn
+	c.dataConnMutex = &sync.RWMutex{}
 	c.driver = driver
 	c.sessionId = newSessionId()
 	c.logger = newFtpLogger(c.sessionId, quiet)
@@ -150,8 +152,16 @@ func (ftpConn *ftpConn) Serve() {
 // Close will manually close this connection, even if the client isn't ready.
 func (ftpConn *ftpConn) Close() {
 	ftpConn.conn.Close()
-	if ftpConn.dataConn != nil {
-		ftpConn.dataConn.Close()
+
+	ftpConn.dataConnMutex.RLock()
+	dataConn := ftpConn.dataConn
+	ftpConn.dataConnMutex.RUnlock()
+
+	if dataConn != nil {
+		ftpConn.dataConnMutex.Lock()
+		dataConn.Close()
+		ftpConn.dataConn = nil
+		ftpConn.dataConnMutex.Unlock()
 	}
 }
 
@@ -239,7 +249,9 @@ func (ftpConn *ftpConn) buildPath(filename string) (fullPath string) {
 // open data socket. Assumes the socket is open and ready to be used.
 func (ftpConn *ftpConn) sendOutofbandReader(reader io.Reader) {
 	defer func() {
+		ftpConn.dataConnMutex.Lock()
 		ftpConn.dataConn = nil
+		ftpConn.dataConnMutex.Unlock()
 	}()
 
 	if !ftpConn.DataConnWait(10 * time.Second) {
@@ -252,13 +264,17 @@ func (ftpConn *ftpConn) sendOutofbandReader(reader io.Reader) {
 	// wait for 125 and 150 messages to be writen
 	time.Sleep(10 * time.Millisecond)
 
-	// we need an empty write for TLS connection if reader is empty
-	_, _ = ftpConn.dataConn.Write([]byte{})
+	ftpConn.dataConnMutex.RLock()
+	dataConn := ftpConn.dataConn
+	ftpConn.dataConnMutex.RUnlock()
 
-	_, err := io.Copy(ftpConn.dataConn, reader)
+	// we need an empty write for TLS connection if reader is empty
+	_, _ = dataConn.Write([]byte{})
+
+	_, err := io.Copy(dataConn, reader)
 
 	if err != nil {
-		ftpConn.dataConn.Close()
+		dataConn.Close()
 
 		ftpConn.logger.Printf("sendOutofbandReader copy error %s", err)
 		ftpConn.writeMessage(550, "Action not taken")
@@ -268,17 +284,21 @@ func (ftpConn *ftpConn) sendOutofbandReader(reader io.Reader) {
 	// Chrome dies on localhost if we close connection to soon
 	time.Sleep(10 * time.Millisecond)
 
-	ftpConn.dataConn.Close()
+	dataConn.Close()
 
 	ftpConn.writeMessage(226, "Transfer complete.")
 }
 
 func (ftpConn *ftpConn) DataConnWait(timeout time.Duration) bool {
-	if ftpConn.dataConn == nil {
+	ftpConn.dataConnMutex.RLock()
+	dataConn := ftpConn.dataConn
+	ftpConn.dataConnMutex.RUnlock()
+
+	if dataConn == nil {
 		return false
 	}
 
-	return ftpConn.dataConn.Wait(timeout)
+	return dataConn.Wait(timeout)
 }
 
 // sendOutofbandData will send a string to the client via the currently open
@@ -305,9 +325,15 @@ func (ftpConn *ftpConn) startTls() {
 }
 
 func (ftpConn *ftpConn) newPassiveSocket() (socket *ftpPassiveSocket, err error) {
-	if ftpConn.dataConn != nil {
-		ftpConn.dataConn.Close()
+	ftpConn.dataConnMutex.RLock()
+	dataConn := ftpConn.dataConn
+	ftpConn.dataConnMutex.RUnlock()
+
+	if dataConn != nil {
+		ftpConn.dataConnMutex.Lock()
+		dataConn.Close()
 		ftpConn.dataConn = nil
+		ftpConn.dataConnMutex.Unlock()
 	}
 
 	var tlsConfig *tls.Config
@@ -319,22 +345,32 @@ func (ftpConn *ftpConn) newPassiveSocket() (socket *ftpPassiveSocket, err error)
 	socket, err = newPassiveSocket(ftpConn.logger, ftpConn.passiveOpts, tlsConfig)
 
 	if err == nil {
+		ftpConn.dataConnMutex.Lock()
 		ftpConn.dataConn = socket
+		ftpConn.dataConnMutex.Unlock()
 	}
 
 	return
 }
 
 func (ftpConn *ftpConn) newActiveSocket(host string, port int) (socket *ftpActiveSocket, err error) {
-	if ftpConn.dataConn != nil {
-		ftpConn.dataConn.Close()
+	ftpConn.dataConnMutex.RLock()
+	dataConn := ftpConn.dataConn
+	ftpConn.dataConnMutex.RUnlock()
+
+	if dataConn != nil {
+		ftpConn.dataConnMutex.Lock()
+		dataConn.Close()
 		ftpConn.dataConn = nil
+		ftpConn.dataConnMutex.Unlock()
 	}
 
 	socket, err = newActiveSocket(host, port, ftpConn.logger)
 
 	if err == nil {
+		ftpConn.dataConnMutex.Lock()
 		ftpConn.dataConn = socket
+		ftpConn.dataConnMutex.Unlock()
 	}
 
 	return

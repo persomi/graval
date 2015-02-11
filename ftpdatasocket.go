@@ -102,6 +102,8 @@ type ftpPassiveSocket struct {
 	listenerMutex *sync.RWMutex
 	conn          net.Conn
 	connMutex     *sync.RWMutex
+	closed        bool
+	closedMutex   *sync.RWMutex
 	connected     *goevent.Event
 	host          string
 	port          int
@@ -116,6 +118,8 @@ func newPassiveSocket(logger *ftpLogger, passiveOpts *PassiveOpts, tlsConfig *tl
 		listenerMutex: &sync.RWMutex{},
 		conn:          nil,
 		connMutex:     &sync.RWMutex{},
+		closed:        false,
+		closedMutex:   &sync.RWMutex{},
 		connected:     goevent.NewEvent(),
 		host:          "",
 		port:          0,
@@ -161,6 +165,10 @@ func (socket *ftpPassiveSocket) Write(p []byte) (n int, err error) {
 
 func (socket *ftpPassiveSocket) Close() error {
 	socket.logger.Print("closing passive data socket")
+
+	socket.closedMutex.Lock()
+	socket.closed = true
+	socket.closedMutex.Unlock()
 
 	socket.listenerMutex.Lock()
 	if socket.listener != nil {
@@ -264,11 +272,21 @@ func (socket *ftpPassiveSocket) acceptConnection() {
 		return
 	}
 
+	socket.connMutex.Lock()
+
+	socket.closedMutex.RLock()
+	if socket.closed {
+		conn.Close()
+		socket.closedMutex.RUnlock()
+		socket.connMutex.Unlock()
+		return
+	}
+	socket.closedMutex.RUnlock()
+
 	if socket.tlsConfig != nil {
 		conn = tls.Server(conn, socket.tlsConfig)
 	}
 
-	socket.connMutex.Lock()
 	socket.conn = conn
 	socket.connMutex.Unlock()
 

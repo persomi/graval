@@ -889,6 +889,10 @@ var _ = Describe("Graval", func() {
 
 						conn.Close()
 
+						// give server goroutine a change to accept conn and close listener
+						runtime.Gosched()
+						time.Sleep(10 * time.Millisecond)
+
 						conn, err = net.Dial("tcp", addr)
 						Expect(err).To(HaveOccurred())
 					})

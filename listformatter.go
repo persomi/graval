@@ -1,6 +1,7 @@
 package graval
 
 import (
+	"bytes"
 	"github.com/jehiah/go-strftime"
 	"os"
 	"strconv"
@@ -20,28 +21,35 @@ func newListFormatter(files []os.FileInfo) *listFormatter {
 // Short returns a string that lists the collection of files by name only,
 // one per line
 func (formatter *listFormatter) Short() string {
-	output := ""
+	var buffer bytes.Buffer
+
 	for _, file := range formatter.files {
-		output += file.Name() + "\r\n"
+		buffer.WriteString(file.Name())
+		buffer.WriteString("\r\n")
 	}
-	output += "\r\n"
-	return output
+
+	buffer.WriteString("\r\n")
+
+	return buffer.String()
 }
 
 // Detailed returns a string that lists the collection of files with extra
 // detail, one per line
 func (formatter *listFormatter) Detailed() string {
-	output := ""
+	var buffer bytes.Buffer
+
 	for _, file := range formatter.files {
-		output += file.Mode().String()
-		output += " 1 owner group "
-		output += lpad(strconv.Itoa(int(file.Size())), 12)
-		output += " " + strftime.Format("%b %d %H:%M", file.ModTime())
-		output += " " + file.Name()
-		output += "\r\n"
+		buffer.WriteString(file.Mode().String())
+		buffer.WriteString(" 1 owner group ")
+		buffer.WriteString(lpad(strconv.Itoa(int(file.Size())), 12))
+		buffer.WriteString(strftime.Format(" %b %d %H:%M ", file.ModTime()))
+		buffer.WriteString(file.Name())
+		buffer.WriteString("\r\n")
 	}
-	output += "\r\n"
-	return output
+
+	buffer.WriteString("\r\n")
+
+	return buffer.String()
 }
 
 func lpad(input string, length int) (result string) {

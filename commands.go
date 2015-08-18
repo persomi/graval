@@ -2,11 +2,12 @@ package graval
 
 import (
 	"fmt"
-	"github.com/jehiah/go-strftime"
-	"github.com/koofr/go-ioutils"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/jehiah/go-strftime"
+	"github.com/koofr/go-ioutils"
 )
 
 type ftpCommand interface {
@@ -524,6 +525,8 @@ func (cmd commandPass) Execute(conn *ftpConn, param string) {
 		conn.writeMessage(230, "Password ok, continue")
 	} else {
 		conn.writeMessage(530, "Incorrect password, not logged in")
+		conn.writeMessage(221, "Goodbye.")
+		conn.Close()
 	}
 }
 

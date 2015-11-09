@@ -1388,6 +1388,47 @@ var _ = Describe("Graval", func() {
 					})
 				})
 
+				Describe("SITE", func() {
+					It("SITE", func() {
+						res("SITE")(553, "action aborted, required param missing")
+					})
+
+					It("SITE CHMOD not logged in", func() {
+						res("SITE CHMOD")(530, "not logged in")
+					})
+
+					It("SITE CHMOD", func() {
+						login()
+						res("SITE CHMOD")(553, "action aborted, required param missing")
+					})
+
+					It("SITE CHMOD 664", func() {
+						login()
+						res("SITE CHMOD 664")(553, "action aborted, required param missing")
+					})
+
+					It("SITE CHMOD 664 file", func() {
+						login()
+						res("SITE CHMOD 664 file")(200, "OK")
+					})
+
+					It("SITE CHMOD 664 dir", func() {
+						login()
+						res("SITE CHMOD 664 dir")(200, "OK")
+					})
+
+					It("SITE CHMOD 664 nonexistent", func() {
+						login()
+						res("SITE CHMOD 664 nonexistent")(200, "OK")
+						res("SIZE nonexistent")(213, "0")
+					})
+
+					It("SITE CHMOD 888 file", func() {
+						login()
+						res("SITE CHMOD 888 file")(450, "CHMOD invalid mode")
+					})
+				})
+
 				Describe("SIZE", func() {
 					It("SIZE", func() {
 						res("SIZE")(553, "action aborted, required param missing")

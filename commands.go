@@ -49,6 +49,7 @@ var (
 		"RNFR": commandRnfr{},
 		"RNTO": commandRnto{},
 		"RMD":  commandRmd{},
+		"SITE": commandSite{},
 		"SIZE": commandSize{},
 		"STOR": commandStor{},
 		"STRU": commandStru{},
@@ -841,6 +842,63 @@ func (cmd commandRmd) Execute(conn *ftpConn, param string) {
 		conn.writeMessage(250, "Directory deleted")
 	} else {
 		conn.writeMessage(550, "Action not taken")
+	}
+}
+
+// commandSite responds to the SITE FTP command.
+//
+// Dummy implementation.
+type commandSite struct{}
+
+func (cmd commandSite) RequireParam() bool {
+	return true
+}
+
+func (cmd commandSite) RequireAuth() bool {
+	return true
+}
+
+func (cmd commandSite) Async() bool {
+	return true
+}
+
+func (cmd commandSite) Execute(conn *ftpConn, param string) {
+	command, param := conn.parseLine(param)
+
+	if command != "CHMOD" {
+		conn.writeMessage(500, "Command not found")
+		return
+	}
+
+	if param == "" {
+		conn.writeMessage(553, "action aborted, required param missing")
+		return
+	}
+
+	mode, param := conn.parseLine(param)
+
+	modeInt, err := strconv.ParseInt(mode, 8, 32)
+
+	if err != nil || modeInt > 511 {
+		conn.writeMessage(450, "CHMOD invalid mode")
+	}
+
+	if param == "" {
+		conn.writeMessage(553, "action aborted, required param missing")
+		return
+	}
+
+	path := conn.buildPath(param)
+	bytes := conn.driver.Bytes(path)
+	if bytes >= 0 {
+		conn.writeMessage(200, "OK")
+	} else {
+		if ok := conn.driver.PutFile(path, strings.NewReader("")); ok {
+			conn.writeMessage(200, "OK")
+		} else {
+			conn.writeMessage(450, "CHMOD error")
+			return
+		}
 	}
 }
 

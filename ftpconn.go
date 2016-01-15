@@ -95,6 +95,11 @@ type BoundCommand struct {
 // goroutine, so use this channel to be notified when the connection can be
 // cleaned up.
 func (ftpConn *ftpConn) Serve() {
+	defer func() {
+		if closer, ok := ftpConn.driver.(io.Closer); ok {
+			closer.Close()
+		}
+	}()
 
 	ftpConn.logger.Printf("Connection Established (%s)", ftpConn.conn.RemoteAddr())
 	// send welcome

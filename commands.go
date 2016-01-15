@@ -947,12 +947,14 @@ func (cmd commandStor) Async() bool {
 func (cmd commandStor) Execute(conn *ftpConn, param string) {
 	targetPath := conn.buildPath(param)
 
-	if !conn.DataConnWait(10 * time.Second) {
+	dataConn, dataConnOk := conn.DataConnWait(10 * time.Second)
+
+	if !dataConnOk {
 		conn.writeMessage(425, "Can't open data connection.")
 		return
 	}
 
-	reader := ioutils.NewStartReader(conn.dataConn, func() {
+	reader := ioutils.NewStartReader(dataConn, func() {
 		conn.writeMessage(150, "Data transfer starting")
 	})
 

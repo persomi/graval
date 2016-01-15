@@ -259,7 +259,9 @@ func (ftpConn *ftpConn) sendOutofbandReader(reader io.Reader) {
 		ftpConn.dataConnMutex.Unlock()
 	}()
 
-	if !ftpConn.DataConnWait(10 * time.Second) {
+	dataConn, dataConnOk := ftpConn.DataConnWait(10 * time.Second)
+
+	if !dataConnOk {
 		ftpConn.writeMessage(425, "Can't open data connection.")
 		return
 	}
@@ -268,10 +270,6 @@ func (ftpConn *ftpConn) sendOutofbandReader(reader io.Reader) {
 
 	// wait for 125 and 150 messages to be writen
 	time.Sleep(10 * time.Millisecond)
-
-	ftpConn.dataConnMutex.RLock()
-	dataConn := ftpConn.dataConn
-	ftpConn.dataConnMutex.RUnlock()
 
 	// we need an empty write for TLS connection if reader is empty
 	_, _ = dataConn.Write([]byte{})
@@ -294,16 +292,20 @@ func (ftpConn *ftpConn) sendOutofbandReader(reader io.Reader) {
 	ftpConn.writeMessage(226, "Transfer complete.")
 }
 
-func (ftpConn *ftpConn) DataConnWait(timeout time.Duration) bool {
+func (ftpConn *ftpConn) DataConnWait(timeout time.Duration) (dataConn ftpDataSocket, ok bool) {
 	ftpConn.dataConnMutex.RLock()
-	dataConn := ftpConn.dataConn
+	dataConn = ftpConn.dataConn
 	ftpConn.dataConnMutex.RUnlock()
 
 	if dataConn == nil {
-		return false
+		return nil, false
 	}
 
-	return dataConn.Wait(timeout)
+	if dataConn.Wait(timeout) {
+		return dataConn, true
+	} else {
+		return nil, false
+	}
 }
 
 // sendOutofbandData will send a string to the client via the currently open

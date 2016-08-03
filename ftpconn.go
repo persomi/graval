@@ -14,6 +14,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"golang.org/x/net/context"
 )
 
 type ftpConn struct {
@@ -36,6 +38,7 @@ type ftpConn struct {
 	usingPbsz     bool
 	usingProt     bool
 	restPosition  int64
+	ctx           context.Context
 }
 
 // NewftpConn constructs a new object that will handle the FTP protocol over
@@ -63,6 +66,7 @@ func newftpConn(tcpConn *net.TCPConn, driver FTPDriver, serverName string, passi
 	} else {
 		c.setupReaderWriter()
 	}
+	c.ctx = context.Background()
 
 	return c
 }
@@ -199,6 +203,10 @@ func (ftpConn *ftpConn) parseLine(line string) (string, string) {
 		return params[0], ""
 	}
 	return params[0], strings.TrimSpace(params[1])
+}
+
+func (ftpConn *ftpConn) writeMessagef(code int, format string, args ...interface{}) (wrote int, err error) {
+	return ftpConn.writeMessagef(code, fmt.Sprintf(format, args...))
 }
 
 // writeMessage will send a standard FTP response back to the client.

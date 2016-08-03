@@ -4,6 +4,8 @@ import (
 	"io"
 	"os"
 	"time"
+
+	"golang.org/x/net/context"
 )
 
 // For each client that connects to the server, a new FTPDriver is required.
@@ -18,50 +20,50 @@ type FTPDriverFactory interface {
 type FTPDriver interface {
 	// params  - username, password
 	// returns - true if the provided details are valid
-	Authenticate(username string, password string) bool
+	Authenticate(ctx context.Context, username string, password string) (context.Context, bool)
 
 	// params  - a file path
 	// returns - an int with the number of bytes in the file or -1 if the file
 	//           doesn't exist
-	Bytes(path string) int64
+	Bytes(ctx context.Context, path string) int64
 
 	// params  - a file path
 	// returns - a time indicating when the requested path was last modified
 	//         - an ok flag if the file doesn't exist or the user lacks
 	//           permissions
-	ModifiedTime(path string) (time.Time, bool)
+	ModifiedTime(ctx context.Context, path string) (time.Time, bool)
 
 	// params  - path
 	// returns - true if the current user is permitted to change to the
 	//           requested path
-	ChangeDir(path string) bool
+	ChangeDir(ctx context.Context, path string) bool
 
 	// params  - path
 	// returns - a collection of items describing the contents of the requested
 	//           path
-	DirContents(path string) ([]os.FileInfo, bool)
+	DirContents(ctx context.Context, path string) ([]os.FileInfo, bool)
 
 	// params  - path
 	// returns - true if the directory was deleted
-	DeleteDir(path string) bool
+	DeleteDir(ctx context.Context, path string) bool
 
 	// params  - path
 	// returns - true if the file was deleted
-	DeleteFile(path string) bool
+	DeleteFile(ctx context.Context, path string) bool
 
 	// params  - from_path, to_path
 	// returns - true if the file was renamed
-	Rename(from_path string, to_path string) bool
+	Rename(ctx context.Context, from_path string, to_path string) bool
 
 	// params  - path
 	// returns - true if the new directory was created
-	MakeDir(path string) bool
+	MakeDir(ctx context.Context, path string) bool
 
 	// params  - path, position
 	// returns - a string containing the file data to send to the client
-	GetFile(path string, position int64) (io.ReadCloser, bool)
+	GetFile(ctx context.Context, path string, position int64) (io.ReadCloser, bool)
 
 	// params  - desination path, an io.Reader containing the file data
 	// returns - true if the data was successfully persisted
-	PutFile(path string, reader io.Reader) bool
+	PutFile(ctx context.Context, path string, reader io.Reader) bool
 }

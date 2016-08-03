@@ -186,7 +186,7 @@ func (cmd commandCwd) Async() bool {
 
 func (cmd commandCwd) Execute(conn *ftpConn, param string) {
 	path := conn.buildPath(param)
-	if conn.driver.ChangeDir(path) {
+	if conn.driver.ChangeDir(conn.ctx, path) {
 		conn.namePrefix = path
 		conn.writeMessage(250, "Directory changed to "+path)
 	} else {
@@ -212,7 +212,7 @@ func (cmd commandDele) Async() bool {
 
 func (cmd commandDele) Execute(conn *ftpConn, param string) {
 	path := conn.buildPath(param)
-	if conn.driver.DeleteFile(path) {
+	if conn.driver.DeleteFile(conn.ctx, path) {
 		conn.writeMessage(250, "File deleted")
 	} else {
 		conn.writeMessage(550, "Action not taken")
@@ -340,7 +340,7 @@ func (cmd commandList) Async() bool {
 
 func (cmd commandList) Execute(conn *ftpConn, param string) {
 	path := conn.buildPath(param)
-	if files, ok := conn.driver.DirContents(path); ok {
+	if files, ok := conn.driver.DirContents(conn.ctx, path); ok {
 		formatter := newListFormatter(files)
 		conn.sendOutofbandData(formatter.Detailed())
 	} else {
@@ -366,7 +366,7 @@ func (cmd commandNlst) Async() bool {
 
 func (cmd commandNlst) Execute(conn *ftpConn, param string) {
 	path := conn.buildPath(param)
-	if files, ok := conn.driver.DirContents(path); ok {
+	if files, ok := conn.driver.DirContents(conn.ctx, path); ok {
 		formatter := newListFormatter(files)
 		conn.sendOutofbandData(formatter.Short())
 	} else {
@@ -392,7 +392,7 @@ func (cmd commandMdtm) Async() bool {
 
 func (cmd commandMdtm) Execute(conn *ftpConn, param string) {
 	path := conn.buildPath(param)
-	if time, ok := conn.driver.ModifiedTime(path); ok {
+	if time, ok := conn.driver.ModifiedTime(conn.ctx, path); ok {
 		conn.writeMessage(213, strftime.Format("%Y%m%d%H%M%S", time))
 	} else {
 		conn.writeMessage(450, "File not available")
@@ -417,7 +417,7 @@ func (cmd commandMkd) Async() bool {
 
 func (cmd commandMkd) Execute(conn *ftpConn, param string) {
 	path := conn.buildPath(param)
-	if conn.driver.MakeDir(path) {
+	if conn.driver.MakeDir(conn.ctx, path) {
 		conn.writeMessage(257, "Directory created")
 	} else {
 		conn.writeMessage(550, "Action not taken")
@@ -520,9 +520,10 @@ func (cmd commandPass) Async() bool {
 }
 
 func (cmd commandPass) Execute(conn *ftpConn, param string) {
-	if conn.driver.Authenticate(conn.reqUser, param) {
+	if ctx, ok := conn.driver.Authenticate(conn.ctx, conn.reqUser, param); ok {
 		conn.user = conn.reqUser
 		conn.reqUser = ""
+		conn.ctx = ctx
 		conn.writeMessage(230, "Password ok, continue")
 	} else {
 		conn.writeMessage(530, "Incorrect password, not logged in")
@@ -765,7 +766,7 @@ func (cmd commandRetr) Async() bool {
 func (cmd commandRetr) Execute(conn *ftpConn, param string) {
 	path := conn.buildPath(param)
 
-	if reader, ok := conn.driver.GetFile(path, conn.restPosition); ok {
+	if reader, ok := conn.driver.GetFile(conn.ctx, path, conn.restPosition); ok {
 		defer reader.Close()
 
 		conn.sendOutofbandReader(reader)
@@ -813,7 +814,7 @@ func (cmd commandRnto) Async() bool {
 
 func (cmd commandRnto) Execute(conn *ftpConn, param string) {
 	toPath := conn.buildPath(param)
-	if conn.driver.Rename(conn.renameFrom, toPath) {
+	if conn.driver.Rename(conn.ctx, conn.renameFrom, toPath) {
 		conn.writeMessage(250, "File renamed")
 	} else {
 		conn.writeMessage(550, "Action not taken")
@@ -838,7 +839,7 @@ func (cmd commandRmd) Async() bool {
 
 func (cmd commandRmd) Execute(conn *ftpConn, param string) {
 	path := conn.buildPath(param)
-	if conn.driver.DeleteDir(path) {
+	if conn.driver.DeleteDir(conn.ctx, path) {
 		conn.writeMessage(250, "Directory deleted")
 	} else {
 		conn.writeMessage(550, "Action not taken")
@@ -889,11 +890,11 @@ func (cmd commandSite) Execute(conn *ftpConn, param string) {
 	}
 
 	path := conn.buildPath(param)
-	bytes := conn.driver.Bytes(path)
+	bytes := conn.driver.Bytes(conn.ctx, path)
 	if bytes >= 0 {
 		conn.writeMessage(200, "OK")
 	} else {
-		if ok := conn.driver.PutFile(path, strings.NewReader("")); ok {
+		if ok := conn.driver.PutFile(conn.ctx, path, strings.NewReader("")); ok {
 			conn.writeMessage(200, "OK")
 		} else {
 			conn.writeMessage(450, "CHMOD error")
@@ -920,7 +921,7 @@ func (cmd commandSize) Async() bool {
 
 func (cmd commandSize) Execute(conn *ftpConn, param string) {
 	path := conn.buildPath(param)
-	bytes := conn.driver.Bytes(path)
+	bytes := conn.driver.Bytes(conn.ctx, path)
 	if bytes >= 0 {
 		conn.writeMessage(213, fmt.Sprintf("%d", bytes))
 	} else {
@@ -958,7 +959,7 @@ func (cmd commandStor) Execute(conn *ftpConn, param string) {
 		conn.writeMessage(150, "Data transfer starting")
 	})
 
-	if ok := conn.driver.PutFile(targetPath, reader); ok {
+	if ok := conn.driver.PutFile(conn.ctx, targetPath, reader); ok {
 		conn.writeMessage(226, "Transfer complete.")
 	} else {
 		conn.writeMessage(450, "error during transfer")

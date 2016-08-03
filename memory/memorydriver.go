@@ -2,7 +2,6 @@ package memory
 
 import (
 	"bytes"
-	"github.com/koofr/graval"
 	"io"
 	"io/ioutil"
 	"os"
@@ -10,6 +9,9 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/koofr/graval"
+	"golang.org/x/net/context"
 )
 
 type MemoryDriver struct {
@@ -18,11 +20,11 @@ type MemoryDriver struct {
 	Password string
 }
 
-func (d *MemoryDriver) Authenticate(username string, password string) bool {
+func (d *MemoryDriver) Authenticate(ctx context.Context, username string, password string) bool {
 	return username == d.Username && password == d.Password
 }
 
-func (d *MemoryDriver) Bytes(path string) int64 {
+func (d *MemoryDriver) Bytes(ctx context.Context, path string) int64 {
 	if f, ok := d.Files[path]; ok {
 		return f.File.Size()
 	} else {
@@ -30,7 +32,7 @@ func (d *MemoryDriver) Bytes(path string) int64 {
 	}
 }
 
-func (d *MemoryDriver) ModifiedTime(path string) (time.Time, bool) {
+func (d *MemoryDriver) ModifiedTime(ctx context.Context, path string) (time.Time, bool) {
 	if f, ok := d.Files[path]; ok {
 		return f.File.ModTime(), true
 	} else {
@@ -38,7 +40,7 @@ func (d *MemoryDriver) ModifiedTime(path string) (time.Time, bool) {
 	}
 }
 
-func (d *MemoryDriver) ChangeDir(path string) bool {
+func (d *MemoryDriver) ChangeDir(ctx context.Context, path string) bool {
 	if f, ok := d.Files[path]; ok && f.File.IsDir() {
 		return true
 	} else {
@@ -46,7 +48,7 @@ func (d *MemoryDriver) ChangeDir(path string) bool {
 	}
 }
 
-func (d *MemoryDriver) DirContents(path string) ([]os.FileInfo, bool) {
+func (d *MemoryDriver) DirContents(ctx context.Context, path string) ([]os.FileInfo, bool) {
 	if f, ok := d.Files[path]; ok && f.File.IsDir() {
 		files := make([]os.FileInfo, 0)
 
@@ -68,7 +70,7 @@ func (d *MemoryDriver) DirContents(path string) ([]os.FileInfo, bool) {
 	}
 }
 
-func (d *MemoryDriver) DeleteDir(path string) bool {
+func (d *MemoryDriver) DeleteDir(ctx context.Context, path string) bool {
 	if f, ok := d.Files[path]; ok && f.File.IsDir() {
 		haschildren := false
 		for p, _ := range d.Files {
@@ -90,7 +92,7 @@ func (d *MemoryDriver) DeleteDir(path string) bool {
 	}
 }
 
-func (d *MemoryDriver) DeleteFile(path string) bool {
+func (d *MemoryDriver) DeleteFile(ctx context.Context, path string) bool {
 	if f, ok := d.Files[path]; ok && !f.File.IsDir() {
 		delete(d.Files, path)
 		return true
@@ -99,7 +101,7 @@ func (d *MemoryDriver) DeleteFile(path string) bool {
 	}
 }
 
-func (d *MemoryDriver) Rename(from_path string, to_path string) bool {
+func (d *MemoryDriver) Rename(ctx context.Context, from_path string, to_path string) bool {
 	if f, from_path_exists := d.Files[from_path]; from_path_exists {
 		if _, to_path_exists := d.Files[to_path]; !to_path_exists {
 			if _, to_path_parent_exists := d.Files[filepath.Dir(to_path)]; to_path_parent_exists {
@@ -134,7 +136,7 @@ func (d *MemoryDriver) Rename(from_path string, to_path string) bool {
 	}
 }
 
-func (d *MemoryDriver) MakeDir(path string) bool {
+func (d *MemoryDriver) MakeDir(ctx context.Context, path string) bool {
 	if _, ok := d.Files[path]; ok {
 		return false
 	} else {
@@ -143,7 +145,7 @@ func (d *MemoryDriver) MakeDir(path string) bool {
 	}
 }
 
-func (d *MemoryDriver) GetFile(path string, position int64) (io.ReadCloser, bool) {
+func (d *MemoryDriver) GetFile(ctx context.Context, path string, position int64) (io.ReadCloser, bool) {
 	if f, ok := d.Files[path]; ok && !f.File.IsDir() {
 		return ioutil.NopCloser(bytes.NewReader(f.Content[position:])), true
 	} else {
@@ -151,7 +153,7 @@ func (d *MemoryDriver) GetFile(path string, position int64) (io.ReadCloser, bool
 	}
 }
 
-func (d *MemoryDriver) PutFile(path string, reader io.Reader) bool {
+func (d *MemoryDriver) PutFile(ctx context.Context, path string, reader io.Reader) bool {
 	if _, path_exists := d.Files[path]; !path_exists {
 		if _, path_parent_exists := d.Files[filepath.Dir(path)]; path_parent_exists {
 			bytes, err := ioutil.ReadAll(reader)
